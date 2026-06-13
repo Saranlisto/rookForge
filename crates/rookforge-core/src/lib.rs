@@ -9,7 +9,9 @@ pub mod movegen;
 pub mod search;
 pub mod uci;
 
-pub use board::{Color, Piece, PieceKind, Square};
+pub use board::{
+    CastlingRights, Color, FenParseError, Piece, PieceKind, Position, Square, STARTING_POSITION_FEN,
+};
 pub use movegen::Move;
 
 /// Human-readable engine name used by the CLI and future UCI identification.

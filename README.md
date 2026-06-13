@@ -32,7 +32,7 @@ Initial core modules:
 
 ## Current Status
 
-Rookforge is currently a production-grade scaffold. It does not play chess yet.
+Rookforge is currently a production-grade scaffold with structural FEN parsing. It does not play chess yet.
 
 Implemented:
 
@@ -40,15 +40,16 @@ Implemented:
 - Core library crate
 - CLI crate with `rookforge` binary
 - Placeholder chess types: `Color`, `PieceKind`, `Piece`, `Square`, and `Move`
+- Position storage for piece placement, side to move, castling rights, en passant target, and move counters
+- Structural FEN parsing for standard Forsyth-Edwards Notation
 - Unit tests for the placeholder types
 - CLI tests for basic command behavior
+- Local validation workflow through `make check`
 - Rust GitHub Actions workflow
 - Initial architecture and devlog docs
 
 Intentionally not implemented yet:
 
-- Board state
-- FEN parsing
 - Legal move generation
 - Perft execution
 - Search
@@ -57,20 +58,30 @@ Intentionally not implemented yet:
 
 ## Roadmap
 
-1. Add board state and FEN parsing.
-2. Add make/unmake move structure.
-3. Add pseudo-legal move generation.
-4. Add legal move filtering and check detection.
-5. Add perft with known test positions.
-6. Add UCI command loop.
-7. Add search and evaluation.
-8. Add benchmarks and strength testing.
-9. Add Lichess bot bridge after the core engine is stable.
+1. Add make/unmake move structure.
+2. Add pseudo-legal move generation.
+3. Add legal move filtering and check detection.
+4. Add perft with known test positions.
+5. Add UCI command loop.
+6. Add search and evaluation.
+7. Add benchmarks and strength testing.
+8. Add Lichess bot bridge after the core engine is stable.
+
+## Local Development
+
+Run the full local validation workflow before every commit:
+
+```bash
+make check
+```
+
+This runs formatting checks, clippy with warnings treated as errors, tests, build, and CLI smoke checks.
 
 ## Build And Test
 
 ```bash
 cargo fmt
+cargo clippy --all-targets -- -D warnings
 cargo test
 cargo build
 ```
@@ -82,4 +93,3 @@ rookforge --version
 rookforge help
 rookforge perft --help
 ```
-

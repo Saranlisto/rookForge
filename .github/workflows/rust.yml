@@ -6,7 +6,7 @@ on:
 
 jobs:
   rust:
-    name: Format, test, and build
+    name: Format, lint, test, and build
     runs-on: ubuntu-latest
 
     steps:
@@ -15,13 +15,17 @@ jobs:
 
       - name: Install stable Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
 
       - name: Check formatting
-        run: cargo fmt --all -- --check
+        run: cargo fmt --check
+
+      - name: Run clippy
+        run: cargo clippy --all-targets -- -D warnings
 
       - name: Run tests
         run: cargo test --workspace
 
       - name: Build workspace
         run: cargo build --workspace
-
