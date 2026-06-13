@@ -1,0 +1,27 @@
+name: Rust CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  rust:
+    name: Format, test, and build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run tests
+        run: cargo test --workspace
+
+      - name: Build workspace
+        run: cargo build --workspace
+

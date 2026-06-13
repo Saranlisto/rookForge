@@ -1,0 +1,12 @@
+[package]
+name = "rookforge-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Core library scaffold for the Rookforge chess engine."
+publish = false
+
+[lib]
+name = "rookforge_core"
+path = "src/lib.rs"
+

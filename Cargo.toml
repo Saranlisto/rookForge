@@ -1,0 +1,12 @@
+[workspace]
+members = [
+    "crates/rookforge-core",
+    "crates/rookforge-cli",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.76"
+
