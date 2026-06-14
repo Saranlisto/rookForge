@@ -1,7 +1,7 @@
 use std::env;
 use std::process::ExitCode;
 
-use rookforge_core::{Position, ENGINE_NAME, STARTING_POSITION_FEN};
+use rookforge_core::{Move, PieceKind, Position, ENGINE_NAME, STARTING_POSITION_FEN};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -28,6 +28,9 @@ fn run(args: impl IntoIterator<Item = String>) -> Result<String, String> {
         ["board", "help"] | ["board", "--help"] | ["board", "-h"] => Ok(board_help_text()),
         ["board", "--fen", fen] => board_from_fen(fen),
         ["board", ..] => Err("invalid board command. Try `rookforge board --help`.".into()),
+        ["move", "help"] | ["move", "--help"] | ["move", "-h"] => Ok(move_help_text()),
+        ["move", "--parse", value] => move_from_uci(value),
+        ["move", ..] => Err("invalid move command. Try `rookforge move --help`.".into()),
         ["perft", "help"] | ["perft", "--help"] | ["perft", "-h"] => Ok(perft_help_text()),
         ["perft", ..] => Err("perft is not implemented yet. Try `rookforge perft --help`.".into()),
         [unknown, ..] => Err(format!(
@@ -38,12 +41,17 @@ fn run(args: impl IntoIterator<Item = String>) -> Result<String, String> {
 
 fn help_text() -> String {
     format!(
-        "{ENGINE_NAME} chess engine scaffold\n\nUSAGE:\n    rookforge <COMMAND>\n\nCOMMANDS:\n    board       Print a FEN position as a board\n    help        Show this help text\n    perft       Inspect perft command options\n\nOPTIONS:\n    -h, --help      Show this help text\n    -V, --version   Show version information\n"
+        "{ENGINE_NAME} chess engine scaffold\n\nUSAGE:\n    rookforge <COMMAND>\n\nCOMMANDS:\n    board       Print a FEN position as a board\n    help        Show this help text\n    move        Parse a UCI-style move\n    perft       Inspect perft command options\n\nOPTIONS:\n    -h, --help      Show this help text\n    -V, --version   Show version information\n"
     )
 }
 
 fn board_help_text() -> String {
     "rookforge board\n\nUSAGE:\n    rookforge board --fen <FEN|startpos>\n\nSTATUS:\n    Prints a parsed FEN position as a human-readable board for local debugging.\n"
+        .to_string()
+}
+
+fn move_help_text() -> String {
+    "rookforge move\n\nUSAGE:\n    rookforge move --parse <MOVE>\n\nSTATUS:\n    Parses UCI-style long algebraic moves for local debugging.\n"
         .to_string()
 }
 
@@ -62,6 +70,31 @@ fn board_from_fen(fen: &str) -> Result<String, String> {
     Position::from_fen(fen)
         .map(|position| format!("{}\n", position.to_pretty_string()))
         .map_err(|error| format!("invalid FEN: {error}"))
+}
+
+fn move_from_uci(value: &str) -> Result<String, String> {
+    Move::from_uci(value)
+        .map(|mv| {
+            format!(
+                "from: {}\nto: {}\npromotion: {}\nuci: {}\n",
+                mv.from.to_algebraic(),
+                mv.to.to_algebraic(),
+                promotion_name(mv.promotion),
+                mv.to_uci()
+            )
+        })
+        .map_err(|error| format!("invalid move: {error}"))
+}
+
+const fn promotion_name(promotion: Option<PieceKind>) -> &'static str {
+    match promotion {
+        None => "none",
+        Some(PieceKind::Queen) => "queen",
+        Some(PieceKind::Rook) => "rook",
+        Some(PieceKind::Bishop) => "bishop",
+        Some(PieceKind::Knight) => "knight",
+        Some(PieceKind::King | PieceKind::Pawn) => "invalid",
+    }
 }
 
 #[cfg(test)]
@@ -115,5 +148,35 @@ mod tests {
 
         assert!(output.contains("8 . . . . . . . ."));
         assert!(output.contains("  a b c d e f g h"));
+    }
+
+    #[test]
+    fn move_command_prints_normal_move() {
+        let output = run([
+            "move".to_string(),
+            "--parse".to_string(),
+            "e2e4".to_string(),
+        ])
+        .expect("move output");
+
+        assert!(output.contains("from: e2"));
+        assert!(output.contains("to: e4"));
+        assert!(output.contains("promotion: none"));
+        assert!(output.contains("uci: e2e4"));
+    }
+
+    #[test]
+    fn move_command_prints_promotion_move() {
+        let output = run([
+            "move".to_string(),
+            "--parse".to_string(),
+            "e7e8q".to_string(),
+        ])
+        .expect("move output");
+
+        assert!(output.contains("from: e7"));
+        assert!(output.contains("to: e8"));
+        assert!(output.contains("promotion: queen"));
+        assert!(output.contains("uci: e7e8q"));
     }
 }

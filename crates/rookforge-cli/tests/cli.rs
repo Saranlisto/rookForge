@@ -65,3 +65,33 @@ fn board_empty_fen_succeeds() {
     assert!(stdout.contains("8 . . . . . . . ."));
     assert!(stdout.contains("  a b c d e f g h"));
 }
+
+#[test]
+fn move_parse_normal_move_succeeds() {
+    let output = Command::new(env!("CARGO_BIN_EXE_rookforge"))
+        .args(["move", "--parse", "e2e4"])
+        .output()
+        .expect("run rookforge move --parse e2e4");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
+    assert!(stdout.contains("from: e2"));
+    assert!(stdout.contains("to: e4"));
+    assert!(stdout.contains("promotion: none"));
+    assert!(stdout.contains("uci: e2e4"));
+}
+
+#[test]
+fn move_parse_promotion_succeeds() {
+    let output = Command::new(env!("CARGO_BIN_EXE_rookforge"))
+        .args(["move", "--parse", "e7e8q"])
+        .output()
+        .expect("run rookforge move --parse e7e8q");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
+    assert!(stdout.contains("from: e7"));
+    assert!(stdout.contains("to: e8"));
+    assert!(stdout.contains("promotion: queen"));
+    assert!(stdout.contains("uci: e7e8q"));
+}
