@@ -32,7 +32,7 @@ Initial core modules:
 
 ## Current Status
 
-Rookforge is currently a production-grade scaffold with structural FEN parsing. It does not play chess yet.
+Rookforge is currently a production-grade scaffold with structural FEN parsing, board inspection helpers, and a local board debug command. It does not play chess yet.
 
 Implemented:
 
@@ -42,6 +42,9 @@ Implemented:
 - Placeholder chess types: `Color`, `PieceKind`, `Piece`, `Square`, and `Move`
 - Position storage for piece placement, side to move, castling rights, en passant target, and move counters
 - Structural FEN parsing for standard Forsyth-Edwards Notation
+- FEN serialization and round-trip tests
+- Square indexing utilities using `a1 = 0` through `h8 = 63`
+- Human-readable board display for debugging
 - Unit tests for the placeholder types
 - CLI tests for basic command behavior
 - Local validation workflow through `make check`
@@ -77,6 +80,13 @@ make check
 
 This runs formatting checks, clippy with warnings treated as errors, tests, build, and CLI smoke checks.
 
+Useful local smoke commands:
+
+```bash
+cargo run -- board --fen startpos
+cargo run -- board --fen "8/8/8/8/8/8/8/8 w - - 0 1"
+```
+
 ## Build And Test
 
 ```bash
@@ -92,4 +102,5 @@ CLI examples:
 rookforge --version
 rookforge help
 rookforge perft --help
+rookforge board --fen startpos
 ```

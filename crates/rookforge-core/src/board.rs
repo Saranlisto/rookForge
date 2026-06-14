@@ -30,6 +30,13 @@ impl Color {
             _ => Err(FenParseError::InvalidSideToMove(value.to_string())),
         }
     }
+
+    const fn to_fen_field(self) -> char {
+        match self {
+            Self::White => 'w',
+            Self::Black => 'b',
+        }
+    }
 }
 
 /// Kind of chess piece, independent of color.
@@ -53,6 +60,17 @@ impl PieceKind {
             'n' => Some(Self::Knight),
             'p' => Some(Self::Pawn),
             _ => None,
+        }
+    }
+
+    const fn to_fen_char(self) -> char {
+        match self {
+            Self::King => 'k',
+            Self::Queen => 'q',
+            Self::Rook => 'r',
+            Self::Bishop => 'b',
+            Self::Knight => 'n',
+            Self::Pawn => 'p',
         }
     }
 }
@@ -81,12 +99,21 @@ impl Piece {
 
         Some(Self::new(color, kind))
     }
+
+    const fn to_fen_char(self) -> char {
+        let marker = self.kind.to_fen_char();
+
+        match self.color {
+            Color::White => marker.to_ascii_uppercase(),
+            Color::Black => marker,
+        }
+    }
 }
 
 /// Zero-based board coordinate.
 ///
-/// Files and ranks are stored as values from 0 through 7. Algebraic notation
-/// parsing is intentionally deferred until FEN and move parsing are introduced.
+/// Files and ranks are stored as values from 0 through 7. The square index
+/// convention is rank-major from White's perspective: `a1` is 0 and `h8` is 63.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Square {
     file: u8,
@@ -99,6 +126,19 @@ impl Square {
     pub const fn new(file: u8, rank: u8) -> Option<Self> {
         if file < 8 && rank < 8 {
             Some(Self { file, rank })
+        } else {
+            None
+        }
+    }
+
+    /// Creates a square from a zero-based index from 0 through 63.
+    #[must_use]
+    pub const fn from_index(index: usize) -> Option<Self> {
+        if index < 64 {
+            Some(Self {
+                file: (index % 8) as u8,
+                rank: (index / 8) as u8,
+            })
         } else {
             None
         }
@@ -131,8 +171,19 @@ impl Square {
         Self::new(file - b'a', rank - b'1')
     }
 
-    const fn index(self) -> usize {
+    /// Converts the square into a zero-based index from 0 through 63.
+    #[must_use]
+    pub const fn index(self) -> usize {
         (self.rank as usize * 8) + self.file as usize
+    }
+
+    /// Converts the square into algebraic notation such as `e4`.
+    #[must_use]
+    pub fn to_algebraic(self) -> String {
+        let file = char::from(b'a' + self.file);
+        let rank = char::from(b'1' + self.rank);
+
+        format!("{file}{rank}")
     }
 }
 
@@ -185,6 +236,29 @@ impl CastlingRights {
 
         Ok(rights)
     }
+
+    fn to_fen_field(self) -> String {
+        if self.is_empty() {
+            return "-".to_string();
+        }
+
+        let mut output = String::new();
+
+        if self.white_kingside {
+            output.push('K');
+        }
+        if self.white_queenside {
+            output.push('Q');
+        }
+        if self.black_kingside {
+            output.push('k');
+        }
+        if self.black_queenside {
+            output.push('q');
+        }
+
+        output
+    }
 }
 
 /// A structurally parsed chess position.
@@ -228,6 +302,50 @@ impl Position {
         self.squares[square.index()]
     }
 
+    /// Places a piece on a square, replacing any existing piece.
+    pub const fn set_piece(&mut self, square: Square, piece: Piece) {
+        self.squares[square.index()] = Some(piece);
+    }
+
+    /// Clears any piece from a square.
+    pub const fn clear_square(&mut self, square: Square) {
+        self.squares[square.index()] = None;
+    }
+
+    /// Counts occupied squares.
+    #[must_use]
+    pub fn count_pieces(&self) -> usize {
+        self.squares.iter().filter(|piece| piece.is_some()).count()
+    }
+
+    /// Returns all squares occupied by a color in ascending square-index order.
+    #[must_use]
+    pub fn occupied_by_color(&self, color: Color) -> Vec<Square> {
+        self.squares
+            .iter()
+            .enumerate()
+            .filter_map(|(index, piece)| {
+                piece
+                    .filter(|piece| piece.color == color)
+                    .and_then(|_| Square::from_index(index))
+            })
+            .collect()
+    }
+
+    /// Returns all squares containing a piece kind in ascending square-index order.
+    #[must_use]
+    pub fn squares_with_piece_kind(&self, kind: PieceKind) -> Vec<Square> {
+        self.squares
+            .iter()
+            .enumerate()
+            .filter_map(|(index, piece)| {
+                piece
+                    .filter(|piece| piece.kind == kind)
+                    .and_then(|_| Square::from_index(index))
+            })
+            .collect()
+    }
+
     /// Returns the side to move.
     #[must_use]
     pub const fn side_to_move(&self) -> Color {
@@ -258,8 +376,81 @@ impl Position {
         self.fullmove_number
     }
 
+    /// Renders the board as ranks 8 through 1 with file labels.
+    #[must_use]
+    pub fn to_pretty_string(&self) -> String {
+        let mut output = String::new();
+
+        for rank in (0..8).rev() {
+            output.push(char::from(b'1' + rank));
+
+            for file in 0..8 {
+                let square = Square::new(file, rank).expect("loop creates valid square");
+                let marker = self
+                    .piece_at(square)
+                    .map_or('.', |piece| piece.to_fen_char());
+
+                output.push(' ');
+                output.push(marker);
+            }
+
+            output.push('\n');
+        }
+
+        output.push_str("  a b c d e f g h");
+        output
+    }
+
+    /// Serializes the position into normalized standard FEN.
+    #[must_use]
+    pub fn to_fen(&self) -> String {
+        format!(
+            "{} {} {} {} {} {}",
+            self.piece_placement_to_fen(),
+            self.side_to_move.to_fen_field(),
+            self.castling_rights.to_fen_field(),
+            self.en_passant_target
+                .map_or_else(|| "-".to_string(), Square::to_algebraic),
+            self.halfmove_clock,
+            self.fullmove_number
+        )
+    }
+
+    fn piece_placement_to_fen(&self) -> String {
+        let mut output = String::new();
+
+        for rank in (0..8).rev() {
+            let mut empty_squares = 0_u8;
+
+            for file in 0..8 {
+                let square = Square::new(file, rank).expect("loop creates valid square");
+
+                if let Some(piece) = self.piece_at(square) {
+                    if empty_squares > 0 {
+                        output.push(char::from(b'0' + empty_squares));
+                        empty_squares = 0;
+                    }
+
+                    output.push(piece.to_fen_char());
+                } else {
+                    empty_squares += 1;
+                }
+            }
+
+            if empty_squares > 0 {
+                output.push(char::from(b'0' + empty_squares));
+            }
+
+            if rank > 0 {
+                output.push('/');
+            }
+        }
+
+        output
+    }
+
     const fn put_piece(&mut self, square: Square, piece: Piece) {
-        self.squares[square.index()] = Some(piece);
+        self.set_piece(square, piece);
     }
 }
 
@@ -448,12 +639,34 @@ mod tests {
 
         assert_eq!(square.file(), 4);
         assert_eq!(square.rank(), 3);
+        assert_eq!(square.index(), 28);
     }
 
     #[test]
     fn square_rejects_coordinates_outside_board() {
         assert_eq!(Square::new(8, 0), None);
         assert_eq!(Square::new(0, 8), None);
+    }
+
+    #[test]
+    fn square_index_convention_matches_rank_major_order() {
+        let cases = [
+            ("a1", 0),
+            ("b1", 1),
+            ("h1", 7),
+            ("a2", 8),
+            ("e4", 28),
+            ("a8", 56),
+            ("h8", 63),
+        ];
+
+        for (name, index) in cases {
+            let square = Square::from_algebraic(name).expect("valid square");
+
+            assert_eq!(square.index(), index);
+            assert_eq!(Square::from_index(index), Some(square));
+            assert_eq!(square.to_algebraic(), name);
+        }
     }
 
     #[test]
@@ -466,9 +679,55 @@ mod tests {
             Square::from_algebraic("h8"),
             Some(Square::new(7, 7).unwrap())
         );
+        assert_eq!(
+            Square::from_algebraic("e4"),
+            Some(Square::new(4, 3).unwrap())
+        );
+    }
+
+    #[test]
+    fn square_rejects_invalid_algebraic_coordinates() {
         assert_eq!(Square::from_algebraic("i1"), None);
+        assert_eq!(Square::from_algebraic("a0"), None);
         assert_eq!(Square::from_algebraic("a9"), None);
+        assert_eq!(Square::from_algebraic("aa"), None);
         assert_eq!(Square::from_algebraic("a10"), None);
+        assert_eq!(Square::from_algebraic(""), None);
+    }
+
+    #[test]
+    fn square_rejects_invalid_indices() {
+        assert_eq!(Square::from_index(64), None);
+        assert_eq!(Square::from_index(100), None);
+    }
+
+    #[test]
+    fn board_helpers_set_clear_count_and_find_pieces() {
+        let mut position = Position::empty();
+        let white_rook = Piece::new(Color::White, PieceKind::Rook);
+        let white_king = Piece::new(Color::White, PieceKind::King);
+        let black_rook = Piece::new(Color::Black, PieceKind::Rook);
+
+        position.set_piece(square("a1"), white_rook);
+        position.set_piece(square("e1"), white_king);
+        position.set_piece(square("h8"), black_rook);
+
+        assert_eq!(position.count_pieces(), 3);
+        assert_eq!(position.piece_at(square("a1")), Some(white_rook));
+        assert_eq!(
+            position.occupied_by_color(Color::White),
+            vec![square("a1"), square("e1")]
+        );
+        assert_eq!(position.occupied_by_color(Color::Black), vec![square("h8")]);
+        assert_eq!(
+            position.squares_with_piece_kind(PieceKind::Rook),
+            vec![square("a1"), square("h8")]
+        );
+
+        position.clear_square(square("a1"));
+
+        assert_eq!(position.count_pieces(), 2);
+        assert_eq!(position.piece_at(square("a1")), None);
     }
 
     #[test]
@@ -476,6 +735,7 @@ mod tests {
         let position = Position::from_fen(STARTING_POSITION_FEN).expect("starting position");
 
         assert_eq!(position.side_to_move(), Color::White);
+        assert_eq!(position.count_pieces(), 32);
         assert_eq!(
             position.castling_rights(),
             CastlingRights {
@@ -505,6 +765,26 @@ mod tests {
             Some(Piece::new(Color::Black, PieceKind::Pawn))
         );
         assert_eq!(position.piece_at(square("e4")), None);
+    }
+
+    #[test]
+    fn renders_starting_position_as_pretty_board() {
+        let position = Position::from_fen(STARTING_POSITION_FEN).expect("starting position");
+
+        assert_eq!(
+            position.to_pretty_string(),
+            concat!(
+                "8 r n b q k b n r\n",
+                "7 p p p p p p p p\n",
+                "6 . . . . . . . .\n",
+                "5 . . . . . . . .\n",
+                "4 . . . . . . . .\n",
+                "3 . . . . . . . .\n",
+                "2 P P P P P P P P\n",
+                "1 R N B Q K B N R\n",
+                "  a b c d e f g h",
+            )
+        );
     }
 
     #[test]
@@ -629,5 +909,31 @@ mod tests {
         for (fen, expected_error) in cases {
             assert_eq!(Position::from_fen(fen), Err(expected_error));
         }
+    }
+
+    #[test]
+    fn serializes_fen_round_trips() {
+        let cases = [
+            STARTING_POSITION_FEN,
+            "8/8/8/8/8/8/8/8 w - - 0 1",
+            "8/8/8/3p4/4P3/8/8/8 b - - 12 34",
+            "8/8/8/8/8/8/8/8 w - - 7 42",
+            "8/8/8/3pP3/8/8/8/8 w - d6 0 1",
+            "r3k2r/ppp2ppp/2n5/3qp3/3P4/2N2N2/PPP2PPP/R3K2R b KQkq - 5 12",
+        ];
+
+        for fen in cases {
+            let position = Position::from_fen(fen).expect("round-trip FEN should parse");
+
+            assert_eq!(position.to_fen(), fen);
+        }
+    }
+
+    #[test]
+    fn serializes_castling_rights_in_standard_order() {
+        let position =
+            Position::from_fen("8/8/8/8/8/8/8/8 w qK - 0 1").expect("unordered castling rights");
+
+        assert_eq!(position.to_fen(), "8/8/8/8/8/8/8/8 w Kq - 0 1");
     }
 }
