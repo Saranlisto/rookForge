@@ -95,3 +95,17 @@ fn move_parse_promotion_succeeds() {
     assert!(stdout.contains("promotion: queen"));
     assert!(stdout.contains("uci: e7e8q"));
 }
+
+#[test]
+fn movegen_pawns_startpos_succeeds() {
+    let output = Command::new(env!("CARGO_BIN_EXE_rookforge"))
+        .args(["movegen", "pawns", "--fen", "startpos"])
+        .output()
+        .expect("run rookforge movegen pawns --fen startpos");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
+    assert!(stdout.contains("a2a3"));
+    assert!(stdout.contains("h2h4"));
+    assert!(stdout.contains("total: 16"));
+}

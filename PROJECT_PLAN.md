@@ -6,14 +6,16 @@
 - Day 002: Structural FEN parsing, position initialization, board-content tests, local validation script, Makefile workflow, and CI clippy alignment.
 - Day 003: Square indexing utilities, board inspection helpers, pretty board display, FEN round-trip serialization, and a CLI board debug command.
 - Day 004: UCI-style move representation, parsing, promotion normalization, CLI move debug command, and local smoke checks.
+- Day 005: Pseudo-legal pawn move generation for pushes, captures, double pushes, promotions, CLI pawn movegen debugging, and local smoke checks.
 
 ## Near-Term Plan
 
-1. Add make/unmake move scaffolding for board state transitions.
-2. Add pseudo-legal move generation.
-3. Add legal move filtering and check detection.
-4. Add perft execution with known validation positions.
-5. Add UCI protocol loop after core move generation is stable.
+1. Add pseudo-legal knight move generation.
+2. Add remaining pseudo-legal piece move generation.
+3. Add make/unmake move scaffolding for board state transitions.
+4. Add legal move filtering and check detection.
+5. Add perft execution with known validation positions.
+6. Add UCI protocol loop after core move generation is stable.
 
 ## Deferred
 

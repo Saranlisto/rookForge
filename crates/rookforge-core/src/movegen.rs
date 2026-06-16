@@ -5,7 +5,116 @@
 use std::fmt;
 use std::str::FromStr;
 
-use crate::board::{PieceKind, Square};
+use crate::board::{Color, PieceKind, Position, Square};
+
+const PROMOTION_PIECES: [PieceKind; 4] = [
+    PieceKind::Queen,
+    PieceKind::Rook,
+    PieceKind::Bishop,
+    PieceKind::Knight,
+];
+
+/// Generates pseudo-legal pawn moves for the side to move.
+///
+/// This intentionally does not check king safety, en passant, or full move
+/// legality. It only applies pawn movement structure against current occupancy.
+#[must_use]
+pub fn generate_pawn_moves(position: &Position) -> Vec<Move> {
+    let side_to_move = position.side_to_move();
+    let mut moves = Vec::new();
+
+    for from in position.occupied_by_color(side_to_move) {
+        if matches!(position.piece_at(from), Some(piece) if piece.kind == PieceKind::Pawn) {
+            generate_pawn_moves_from(position, side_to_move, from, &mut moves);
+        }
+    }
+
+    moves
+}
+
+fn generate_pawn_moves_from(
+    position: &Position,
+    color: Color,
+    from: Square,
+    moves: &mut Vec<Move>,
+) {
+    add_pawn_pushes(position, color, from, moves);
+    add_pawn_captures(position, color, from, moves);
+}
+
+fn add_pawn_pushes(position: &Position, color: Color, from: Square, moves: &mut Vec<Move>) {
+    let Some(one_step) = offset_square(from, 0, pawn_direction(color)) else {
+        return;
+    };
+
+    if position.piece_at(one_step).is_some() {
+        return;
+    }
+
+    add_pawn_move(from, one_step, moves);
+
+    if from.rank() != pawn_starting_rank(color) {
+        return;
+    }
+
+    let Some(two_steps) = offset_square(from, 0, pawn_direction(color) * 2) else {
+        return;
+    };
+
+    if position.piece_at(two_steps).is_none() {
+        moves.push(Move::quiet(from, two_steps));
+    }
+}
+
+fn add_pawn_captures(position: &Position, color: Color, from: Square, moves: &mut Vec<Move>) {
+    for file_delta in [-1, 1] {
+        let Some(target) = offset_square(from, file_delta, pawn_direction(color)) else {
+            continue;
+        };
+
+        if matches!(position.piece_at(target), Some(piece) if piece.color == color.opposite()) {
+            add_pawn_move(from, target, moves);
+        }
+    }
+}
+
+fn add_pawn_move(from: Square, to: Square, moves: &mut Vec<Move>) {
+    if is_promotion_rank(to) {
+        for promotion in PROMOTION_PIECES {
+            moves.push(
+                Move::promotion(from, to, promotion)
+                    .expect("promotion target is already on a promotion rank"),
+            );
+        }
+    } else {
+        moves.push(Move::quiet(from, to));
+    }
+}
+
+const fn pawn_direction(color: Color) -> i8 {
+    match color {
+        Color::White => 1,
+        Color::Black => -1,
+    }
+}
+
+const fn pawn_starting_rank(color: Color) -> u8 {
+    match color {
+        Color::White => 1,
+        Color::Black => 6,
+    }
+}
+
+fn offset_square(square: Square, file_delta: i8, rank_delta: i8) -> Option<Square> {
+    let file = square.file() as i8 + file_delta;
+    let rank = square.rank() as i8 + rank_delta;
+
+    if !(0..=7).contains(&file) || !(0..=7).contains(&rank) {
+        return None;
+    }
+
+    Square::new(file as u8, rank as u8)
+}
 
 /// A chess move from one square to another, with an optional promotion kind.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -184,6 +293,25 @@ mod tests {
         Square::from_algebraic(value).expect("valid test square")
     }
 
+    fn pawn_moves_from_fen(fen: &str) -> Vec<String> {
+        let position = Position::from_fen(fen).expect("valid test FEN");
+        let mut moves = generate_pawn_moves(&position)
+            .into_iter()
+            .map(Move::to_uci)
+            .collect::<Vec<_>>();
+        moves.sort();
+        moves
+    }
+
+    fn sorted_moves(values: &[&str]) -> Vec<String> {
+        let mut moves = values
+            .iter()
+            .map(|value| value.to_string())
+            .collect::<Vec<_>>();
+        moves.sort();
+        moves
+    }
+
     #[test]
     fn quiet_move_has_no_promotion() {
         let from = Square::new(1, 0).expect("valid from square");
@@ -351,5 +479,136 @@ mod tests {
         for value in cases {
             assert_eq!(Move::from_uci(value).expect("valid move").to_uci(), value);
         }
+    }
+
+    #[test]
+    fn generates_white_pawn_single_push() {
+        assert_eq!(
+            pawn_moves_from_fen("8/8/8/8/4P3/8/8/8 w - - 0 1"),
+            sorted_moves(&["e4e5"])
+        );
+    }
+
+    #[test]
+    fn generates_black_pawn_single_push() {
+        assert_eq!(
+            pawn_moves_from_fen("8/8/8/4p3/8/8/8/8 b - - 0 1"),
+            sorted_moves(&["e5e4"])
+        );
+    }
+
+    #[test]
+    fn generates_white_pawn_double_push_from_starting_rank() {
+        assert_eq!(
+            pawn_moves_from_fen("8/8/8/8/8/8/4P3/8 w - - 0 1"),
+            sorted_moves(&["e2e3", "e2e4"])
+        );
+    }
+
+    #[test]
+    fn generates_black_pawn_double_push_from_starting_rank() {
+        assert_eq!(
+            pawn_moves_from_fen("8/4p3/8/8/8/8/8/8 b - - 0 1"),
+            sorted_moves(&["e7e5", "e7e6"])
+        );
+    }
+
+    #[test]
+    fn double_push_is_blocked_by_piece_directly_ahead() {
+        assert_eq!(
+            pawn_moves_from_fen("8/8/8/8/8/4n3/4P3/8 w - - 0 1"),
+            Vec::<String>::new()
+        );
+    }
+
+    #[test]
+    fn double_push_is_blocked_by_piece_two_squares_ahead() {
+        assert_eq!(
+            pawn_moves_from_fen("8/8/8/8/4n3/8/4P3/8 w - - 0 1"),
+            sorted_moves(&["e2e3"])
+        );
+    }
+
+    #[test]
+    fn generates_white_pawn_diagonal_captures() {
+        assert_eq!(
+            pawn_moves_from_fen("8/8/8/3npn2/4P3/8/8/8 w - - 0 1"),
+            sorted_moves(&["e4d5", "e4f5"])
+        );
+    }
+
+    #[test]
+    fn generates_black_pawn_diagonal_captures() {
+        assert_eq!(
+            pawn_moves_from_fen("8/8/8/4p3/3PPP2/8/8/8 b - - 0 1"),
+            sorted_moves(&["e5d4", "e5f4"])
+        );
+    }
+
+    #[test]
+    fn does_not_capture_empty_diagonal_squares() {
+        assert_eq!(
+            pawn_moves_from_fen("8/8/8/4p3/4P3/8/8/8 w - - 0 1"),
+            Vec::<String>::new()
+        );
+    }
+
+    #[test]
+    fn does_not_capture_own_pieces() {
+        assert_eq!(
+            pawn_moves_from_fen("8/8/8/3NpN2/4P3/8/8/8 w - - 0 1"),
+            Vec::<String>::new()
+        );
+    }
+
+    #[test]
+    fn generates_white_quiet_promotions() {
+        assert_eq!(
+            pawn_moves_from_fen("8/4P3/8/8/8/8/8/8 w - - 0 1"),
+            sorted_moves(&["e7e8q", "e7e8r", "e7e8b", "e7e8n"])
+        );
+    }
+
+    #[test]
+    fn generates_black_quiet_promotions() {
+        assert_eq!(
+            pawn_moves_from_fen("8/8/8/8/8/8/4p3/8 b - - 0 1"),
+            sorted_moves(&["e2e1q", "e2e1r", "e2e1b", "e2e1n"])
+        );
+    }
+
+    #[test]
+    fn generates_white_promotion_captures() {
+        assert_eq!(
+            pawn_moves_from_fen("3nR3/4P3/8/8/8/8/8/8 w - - 0 1"),
+            sorted_moves(&["e7d8q", "e7d8r", "e7d8b", "e7d8n"])
+        );
+    }
+
+    #[test]
+    fn generates_black_promotion_captures() {
+        assert_eq!(
+            pawn_moves_from_fen("8/8/8/8/8/8/4p3/3Nr3 b - - 0 1"),
+            sorted_moves(&["e2d1q", "e2d1r", "e2d1b", "e2d1n"])
+        );
+    }
+
+    #[test]
+    fn edge_file_pawns_do_not_wrap_around_board() {
+        assert_eq!(
+            pawn_moves_from_fen("8/8/8/8/8/Nn4nN/P6P/8 w - - 0 1"),
+            sorted_moves(&["a2b3", "h2g3"])
+        );
+    }
+
+    #[test]
+    fn starting_position_generates_sixteen_pawn_moves() {
+        assert_eq!(
+            pawn_moves_from_fen(crate::board::STARTING_POSITION_FEN),
+            sorted_moves(&[
+                "a2a3", "a2a4", "b2b3", "b2b4", "c2c3", "c2c4", "d2d3", "d2d4", "e2e3", "e2e4",
+                "f2f3", "f2f4", "g2g3", "g2g4", "h2h3", "h2h4",
+            ])
+        );
     }
 }

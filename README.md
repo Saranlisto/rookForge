@@ -32,7 +32,7 @@ Initial core modules:
 
 ## Current Status
 
-Rookforge is currently a production-grade scaffold with structural FEN parsing, board inspection helpers, UCI-style move parsing, and local debug commands. It does not play chess yet.
+Rookforge is currently a production-grade scaffold with structural FEN parsing, board inspection helpers, UCI-style move parsing, pseudo-legal pawn move generation, and local debug commands. It does not play chess yet.
 
 Implemented:
 
@@ -45,6 +45,7 @@ Implemented:
 - FEN serialization and round-trip tests
 - Square indexing utilities using `a1 = 0` through `h8 = 63`
 - UCI-style move parsing and serialization such as `e2e4` and `e7e8q`
+- Pseudo-legal pawn move generation for pushes, captures, double pushes, and promotions
 - Human-readable board display for debugging
 - Unit tests for the placeholder types
 - CLI tests for basic command behavior
@@ -55,6 +56,8 @@ Implemented:
 Intentionally not implemented yet:
 
 - Legal move generation
+- Non-pawn move generation
+- En passant
 - Perft execution
 - Search
 - Evaluation
@@ -88,6 +91,7 @@ cargo run -- board --fen startpos
 cargo run -- board --fen "8/8/8/8/8/8/8/8 w - - 0 1"
 cargo run -- move --parse e2e4
 cargo run -- move --parse e7e8q
+cargo run -- movegen pawns --fen startpos
 ```
 
 ## Build And Test
@@ -107,4 +111,5 @@ rookforge help
 rookforge perft --help
 rookforge board --fen startpos
 rookforge move --parse e2e4
+rookforge movegen pawns --fen startpos
 ```

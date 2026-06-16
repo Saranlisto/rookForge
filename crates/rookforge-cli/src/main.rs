@@ -1,7 +1,9 @@
 use std::env;
 use std::process::ExitCode;
 
-use rookforge_core::{Move, PieceKind, Position, ENGINE_NAME, STARTING_POSITION_FEN};
+use rookforge_core::{
+    generate_pawn_moves, Move, PieceKind, Position, ENGINE_NAME, STARTING_POSITION_FEN,
+};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -31,6 +33,9 @@ fn run(args: impl IntoIterator<Item = String>) -> Result<String, String> {
         ["move", "help"] | ["move", "--help"] | ["move", "-h"] => Ok(move_help_text()),
         ["move", "--parse", value] => move_from_uci(value),
         ["move", ..] => Err("invalid move command. Try `rookforge move --help`.".into()),
+        ["movegen", "help"] | ["movegen", "--help"] | ["movegen", "-h"] => Ok(movegen_help_text()),
+        ["movegen", "pawns", "--fen", fen] => pawn_moves_from_fen(fen),
+        ["movegen", ..] => Err("invalid movegen command. Try `rookforge movegen --help`.".into()),
         ["perft", "help"] | ["perft", "--help"] | ["perft", "-h"] => Ok(perft_help_text()),
         ["perft", ..] => Err("perft is not implemented yet. Try `rookforge perft --help`.".into()),
         [unknown, ..] => Err(format!(
@@ -41,7 +46,7 @@ fn run(args: impl IntoIterator<Item = String>) -> Result<String, String> {
 
 fn help_text() -> String {
     format!(
-        "{ENGINE_NAME} chess engine scaffold\n\nUSAGE:\n    rookforge <COMMAND>\n\nCOMMANDS:\n    board       Print a FEN position as a board\n    help        Show this help text\n    move        Parse a UCI-style move\n    perft       Inspect perft command options\n\nOPTIONS:\n    -h, --help      Show this help text\n    -V, --version   Show version information\n"
+        "{ENGINE_NAME} chess engine scaffold\n\nUSAGE:\n    rookforge <COMMAND>\n\nCOMMANDS:\n    board       Print a FEN position as a board\n    help        Show this help text\n    move        Parse a UCI-style move\n    movegen     Generate selected pseudo-legal moves\n    perft       Inspect perft command options\n\nOPTIONS:\n    -h, --help      Show this help text\n    -V, --version   Show version information\n"
     )
 }
 
@@ -55,21 +60,18 @@ fn move_help_text() -> String {
         .to_string()
 }
 
+fn movegen_help_text() -> String {
+    "rookforge movegen\n\nUSAGE:\n    rookforge movegen pawns --fen <FEN|startpos>\n\nSTATUS:\n    Generates pseudo-legal pawn moves for local debugging.\n"
+        .to_string()
+}
+
 fn perft_help_text() -> String {
     "rookforge perft\n\nUSAGE:\n    rookforge perft --help\n\nSTATUS:\n    Perft execution is planned but not implemented in the scaffold.\n"
         .to_string()
 }
 
 fn board_from_fen(fen: &str) -> Result<String, String> {
-    let fen = if fen == "startpos" {
-        STARTING_POSITION_FEN
-    } else {
-        fen
-    };
-
-    Position::from_fen(fen)
-        .map(|position| format!("{}\n", position.to_pretty_string()))
-        .map_err(|error| format!("invalid FEN: {error}"))
+    position_from_fen(fen).map(|position| format!("{}\n", position.to_pretty_string()))
 }
 
 fn move_from_uci(value: &str) -> Result<String, String> {
@@ -84,6 +86,34 @@ fn move_from_uci(value: &str) -> Result<String, String> {
             )
         })
         .map_err(|error| format!("invalid move: {error}"))
+}
+
+fn pawn_moves_from_fen(fen: &str) -> Result<String, String> {
+    let position = position_from_fen(fen)?;
+    let mut moves = generate_pawn_moves(&position)
+        .into_iter()
+        .map(Move::to_uci)
+        .collect::<Vec<_>>();
+    moves.sort();
+
+    let mut output = String::new();
+    for mv in &moves {
+        output.push_str(mv);
+        output.push('\n');
+    }
+    output.push_str(&format!("total: {}\n", moves.len()));
+
+    Ok(output)
+}
+
+fn position_from_fen(fen: &str) -> Result<Position, String> {
+    let fen = if fen == "startpos" {
+        STARTING_POSITION_FEN
+    } else {
+        fen
+    };
+
+    Position::from_fen(fen).map_err(|error| format!("invalid FEN: {error}"))
 }
 
 const fn promotion_name(promotion: Option<PieceKind>) -> &'static str {
@@ -178,5 +208,20 @@ mod tests {
         assert!(output.contains("to: e8"));
         assert!(output.contains("promotion: queen"));
         assert!(output.contains("uci: e7e8q"));
+    }
+
+    #[test]
+    fn movegen_pawns_command_prints_starting_position_moves() {
+        let output = run([
+            "movegen".to_string(),
+            "pawns".to_string(),
+            "--fen".to_string(),
+            "startpos".to_string(),
+        ])
+        .expect("movegen output");
+
+        assert!(output.contains("a2a3"));
+        assert!(output.contains("h2h4"));
+        assert!(output.contains("total: 16"));
     }
 }
