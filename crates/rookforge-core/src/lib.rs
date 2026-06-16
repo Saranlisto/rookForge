@@ -12,7 +12,10 @@ pub mod uci;
 pub use board::{
     CastlingRights, Color, FenParseError, Piece, PieceKind, Position, Square, STARTING_POSITION_FEN,
 };
-pub use movegen::{generate_pawn_moves, Move, MoveParseError};
+pub use movegen::{
+    generate_king_moves, generate_knight_moves, generate_non_sliding_moves, generate_pawn_moves,
+    Move, MoveParseError,
+};
 
 /// Human-readable engine name used by the CLI and future UCI identification.
 pub const ENGINE_NAME: &str = "Rookforge";

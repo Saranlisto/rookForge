@@ -1,6 +1,6 @@
-//! Move representation and parsing scaffold.
+//! Move representation, parsing, and early pseudo-legal generation.
 //!
-//! Legal and pseudo-legal generation are intentionally not implemented yet.
+//! Full legal move generation is intentionally not implemented yet.
 
 use std::fmt;
 use std::str::FromStr;
@@ -12,6 +12,26 @@ const PROMOTION_PIECES: [PieceKind; 4] = [
     PieceKind::Rook,
     PieceKind::Bishop,
     PieceKind::Knight,
+];
+const KNIGHT_DELTAS: [(i8, i8); 8] = [
+    (1, 2),
+    (2, 1),
+    (2, -1),
+    (1, -2),
+    (-1, -2),
+    (-2, -1),
+    (-2, 1),
+    (-1, 2),
+];
+const KING_DELTAS: [(i8, i8); 8] = [
+    (-1, -1),
+    (0, -1),
+    (1, -1),
+    (-1, 0),
+    (1, 0),
+    (-1, 1),
+    (0, 1),
+    (1, 1),
 ];
 
 /// Generates pseudo-legal pawn moves for the side to move.
@@ -30,6 +50,67 @@ pub fn generate_pawn_moves(position: &Position) -> Vec<Move> {
     }
 
     moves
+}
+
+/// Generates pseudo-legal knight moves for the side to move.
+///
+/// This skips off-board moves and friendly-occupied targets, but it does not
+/// check whether the king is in check.
+#[must_use]
+pub fn generate_knight_moves(position: &Position) -> Vec<Move> {
+    generate_leaper_moves(position, PieceKind::Knight, &KNIGHT_DELTAS)
+}
+
+/// Generates pseudo-legal one-square king moves for the side to move.
+///
+/// Castling and attacked-square checks are intentionally not implemented here.
+#[must_use]
+pub fn generate_king_moves(position: &Position) -> Vec<Move> {
+    generate_leaper_moves(position, PieceKind::King, &KING_DELTAS)
+}
+
+/// Generates the currently implemented non-sliding pseudo-legal moves.
+#[must_use]
+pub fn generate_non_sliding_moves(position: &Position) -> Vec<Move> {
+    let mut moves = generate_pawn_moves(position);
+    moves.extend(generate_knight_moves(position));
+    moves.extend(generate_king_moves(position));
+    moves
+}
+
+fn generate_leaper_moves(position: &Position, kind: PieceKind, deltas: &[(i8, i8)]) -> Vec<Move> {
+    let side_to_move = position.side_to_move();
+    let mut moves = Vec::new();
+
+    for from in position.occupied_by_color(side_to_move) {
+        if matches!(position.piece_at(from), Some(piece) if piece.kind == kind) {
+            add_leaper_moves_from(position, side_to_move, from, deltas, &mut moves);
+        }
+    }
+
+    moves
+}
+
+fn add_leaper_moves_from(
+    position: &Position,
+    color: Color,
+    from: Square,
+    deltas: &[(i8, i8)],
+    moves: &mut Vec<Move>,
+) {
+    for &(file_delta, rank_delta) in deltas {
+        let Some(to) = offset_square(from, file_delta, rank_delta) else {
+            continue;
+        };
+
+        if can_land_on(position, color, to) {
+            moves.push(Move::quiet(from, to));
+        }
+    }
+}
+
+fn can_land_on(position: &Position, color: Color, target: Square) -> bool {
+    !matches!(position.piece_at(target), Some(piece) if piece.color == color)
 }
 
 fn generate_pawn_moves_from(
@@ -293,14 +374,26 @@ mod tests {
         Square::from_algebraic(value).expect("valid test square")
     }
 
-    fn pawn_moves_from_fen(fen: &str) -> Vec<String> {
+    fn moves_from_fen(fen: &str, generator: fn(&Position) -> Vec<Move>) -> Vec<String> {
         let position = Position::from_fen(fen).expect("valid test FEN");
-        let mut moves = generate_pawn_moves(&position)
+        let mut moves = generator(&position)
             .into_iter()
             .map(Move::to_uci)
             .collect::<Vec<_>>();
         moves.sort();
         moves
+    }
+
+    fn pawn_moves_from_fen(fen: &str) -> Vec<String> {
+        moves_from_fen(fen, generate_pawn_moves)
+    }
+
+    fn knight_moves_from_fen(fen: &str) -> Vec<String> {
+        moves_from_fen(fen, generate_knight_moves)
+    }
+
+    fn king_moves_from_fen(fen: &str) -> Vec<String> {
+        moves_from_fen(fen, generate_king_moves)
     }
 
     fn sorted_moves(values: &[&str]) -> Vec<String> {
@@ -609,6 +702,126 @@ mod tests {
                 "a2a3", "a2a4", "b2b3", "b2b4", "c2c3", "c2c4", "d2d3", "d2d4", "e2e3", "e2e4",
                 "f2f3", "f2f4", "g2g3", "g2g4", "h2h3", "h2h4",
             ])
+        );
+    }
+
+    #[test]
+    fn white_knight_in_center_has_eight_moves() {
+        assert_eq!(
+            knight_moves_from_fen("8/8/8/8/4N3/8/8/8 w - - 0 1"),
+            sorted_moves(&["e4c3", "e4c5", "e4d2", "e4d6", "e4f2", "e4f6", "e4g3", "e4g5",])
+        );
+    }
+
+    #[test]
+    fn black_knight_in_center_has_eight_moves() {
+        assert_eq!(
+            knight_moves_from_fen("8/8/8/8/4n3/8/8/8 b - - 0 1"),
+            sorted_moves(&["e4c3", "e4c5", "e4d2", "e4d6", "e4f2", "e4f6", "e4g3", "e4g5",])
+        );
+    }
+
+    #[test]
+    fn knight_on_a1_has_only_valid_board_moves() {
+        assert_eq!(
+            knight_moves_from_fen("8/8/8/8/8/8/8/N7 w - - 0 1"),
+            sorted_moves(&["a1b3", "a1c2"])
+        );
+    }
+
+    #[test]
+    fn knight_on_h8_has_only_valid_board_moves() {
+        assert_eq!(
+            knight_moves_from_fen("7N/8/8/8/8/8/8/8 w - - 0 1"),
+            sorted_moves(&["h8f7", "h8g6"])
+        );
+    }
+
+    #[test]
+    fn knight_cannot_capture_own_piece() {
+        assert_eq!(
+            knight_moves_from_fen("8/8/3P1P2/8/4N3/8/8/8 w - - 0 1"),
+            sorted_moves(&["e4c3", "e4c5", "e4d2", "e4f2", "e4g3", "e4g5"])
+        );
+    }
+
+    #[test]
+    fn knight_can_capture_opponent_piece() {
+        assert_eq!(
+            knight_moves_from_fen("8/8/3p1p2/8/4N3/8/8/8 w - - 0 1"),
+            sorted_moves(&["e4c3", "e4c5", "e4d2", "e4d6", "e4f2", "e4f6", "e4g3", "e4g5",])
+        );
+    }
+
+    #[test]
+    fn starting_position_generates_four_white_knight_moves() {
+        assert_eq!(
+            knight_moves_from_fen(crate::board::STARTING_POSITION_FEN),
+            sorted_moves(&["b1a3", "b1c3", "g1f3", "g1h3"])
+        );
+    }
+
+    #[test]
+    fn starting_position_generates_four_black_knight_moves() {
+        assert_eq!(
+            knight_moves_from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1"),
+            sorted_moves(&["b8a6", "b8c6", "g8f6", "g8h6"])
+        );
+    }
+
+    #[test]
+    fn king_in_center_has_eight_moves() {
+        assert_eq!(
+            king_moves_from_fen("8/8/8/8/4K3/8/8/8 w - - 0 1"),
+            sorted_moves(&["e4d3", "e4d4", "e4d5", "e4e3", "e4e5", "e4f3", "e4f4", "e4f5",])
+        );
+    }
+
+    #[test]
+    fn king_on_a1_has_only_valid_board_moves() {
+        assert_eq!(
+            king_moves_from_fen("8/8/8/8/8/8/8/K7 w - - 0 1"),
+            sorted_moves(&["a1a2", "a1b1", "a1b2"])
+        );
+    }
+
+    #[test]
+    fn king_on_h8_has_only_valid_board_moves() {
+        assert_eq!(
+            king_moves_from_fen("7K/8/8/8/8/8/8/8 w - - 0 1"),
+            sorted_moves(&["h8g7", "h8g8", "h8h7"])
+        );
+    }
+
+    #[test]
+    fn king_cannot_move_onto_own_piece() {
+        assert_eq!(
+            king_moves_from_fen("8/8/8/3PPP2/3PKP2/3PPP2/8/8 w - - 0 1"),
+            Vec::<String>::new()
+        );
+    }
+
+    #[test]
+    fn king_can_capture_opponent_piece() {
+        assert_eq!(
+            king_moves_from_fen("8/8/8/3pPP2/3PKP2/3PPP2/8/8 w - - 0 1"),
+            sorted_moves(&["e4d5"])
+        );
+    }
+
+    #[test]
+    fn king_moves_are_generated_only_for_side_to_move() {
+        assert_eq!(
+            king_moves_from_fen("k7/8/8/8/4K3/8/8/8 b - - 0 1"),
+            sorted_moves(&["a8a7", "a8b7", "a8b8"])
+        );
+    }
+
+    #[test]
+    fn king_move_generation_does_not_generate_castling() {
+        assert_eq!(
+            king_moves_from_fen("8/8/8/8/8/8/8/R3K2R w KQ - 0 1"),
+            sorted_moves(&["e1d1", "e1d2", "e1e2", "e1f1", "e1f2"])
         );
     }
 }

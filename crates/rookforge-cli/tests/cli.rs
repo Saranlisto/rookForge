@@ -109,3 +109,31 @@ fn movegen_pawns_startpos_succeeds() {
     assert!(stdout.contains("h2h4"));
     assert!(stdout.contains("total: 16"));
 }
+
+#[test]
+fn movegen_knights_startpos_succeeds() {
+    let output = Command::new(env!("CARGO_BIN_EXE_rookforge"))
+        .args(["movegen", "knights", "--fen", "startpos"])
+        .output()
+        .expect("run rookforge movegen knights --fen startpos");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
+    assert!(stdout.contains("b1a3"));
+    assert!(stdout.contains("g1h3"));
+    assert!(stdout.contains("total: 4"));
+}
+
+#[test]
+fn movegen_kings_center_succeeds() {
+    let output = Command::new(env!("CARGO_BIN_EXE_rookforge"))
+        .args(["movegen", "kings", "--fen", "8/8/8/8/4K3/8/8/8 w - - 0 1"])
+        .output()
+        .expect("run rookforge movegen kings --fen center king");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
+    assert!(stdout.contains("e4d3"));
+    assert!(stdout.contains("e4f5"));
+    assert!(stdout.contains("total: 8"));
+}

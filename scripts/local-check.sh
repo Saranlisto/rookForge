@@ -13,3 +13,5 @@ cargo run -- board --fen "8/8/8/8/8/8/8/8 w - - 0 1"
 cargo run -- move --parse e2e4
 cargo run -- move --parse e7e8q
 cargo run -- movegen pawns --fen startpos
+cargo run -- movegen knights --fen startpos
+cargo run -- movegen kings --fen "8/8/8/8/4K3/8/8/8 w - - 0 1"

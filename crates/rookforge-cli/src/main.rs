@@ -2,7 +2,8 @@ use std::env;
 use std::process::ExitCode;
 
 use rookforge_core::{
-    generate_pawn_moves, Move, PieceKind, Position, ENGINE_NAME, STARTING_POSITION_FEN,
+    generate_king_moves, generate_knight_moves, generate_pawn_moves, Move, PieceKind, Position,
+    ENGINE_NAME, STARTING_POSITION_FEN,
 };
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -35,6 +36,8 @@ fn run(args: impl IntoIterator<Item = String>) -> Result<String, String> {
         ["move", ..] => Err("invalid move command. Try `rookforge move --help`.".into()),
         ["movegen", "help"] | ["movegen", "--help"] | ["movegen", "-h"] => Ok(movegen_help_text()),
         ["movegen", "pawns", "--fen", fen] => pawn_moves_from_fen(fen),
+        ["movegen", "knights", "--fen", fen] => knight_moves_from_fen(fen),
+        ["movegen", "kings", "--fen", fen] => king_moves_from_fen(fen),
         ["movegen", ..] => Err("invalid movegen command. Try `rookforge movegen --help`.".into()),
         ["perft", "help"] | ["perft", "--help"] | ["perft", "-h"] => Ok(perft_help_text()),
         ["perft", ..] => Err("perft is not implemented yet. Try `rookforge perft --help`.".into()),
@@ -61,7 +64,7 @@ fn move_help_text() -> String {
 }
 
 fn movegen_help_text() -> String {
-    "rookforge movegen\n\nUSAGE:\n    rookforge movegen pawns --fen <FEN|startpos>\n\nSTATUS:\n    Generates pseudo-legal pawn moves for local debugging.\n"
+    "rookforge movegen\n\nUSAGE:\n    rookforge movegen pawns --fen <FEN|startpos>\n    rookforge movegen knights --fen <FEN|startpos>\n    rookforge movegen kings --fen <FEN|startpos>\n\nSTATUS:\n    Generates selected pseudo-legal moves for local debugging.\n"
         .to_string()
 }
 
@@ -89,8 +92,23 @@ fn move_from_uci(value: &str) -> Result<String, String> {
 }
 
 fn pawn_moves_from_fen(fen: &str) -> Result<String, String> {
+    movegen_moves_from_fen(fen, generate_pawn_moves)
+}
+
+fn knight_moves_from_fen(fen: &str) -> Result<String, String> {
+    movegen_moves_from_fen(fen, generate_knight_moves)
+}
+
+fn king_moves_from_fen(fen: &str) -> Result<String, String> {
+    movegen_moves_from_fen(fen, generate_king_moves)
+}
+
+fn movegen_moves_from_fen(
+    fen: &str,
+    generator: fn(&Position) -> Vec<Move>,
+) -> Result<String, String> {
     let position = position_from_fen(fen)?;
-    let mut moves = generate_pawn_moves(&position)
+    let mut moves = generator(&position)
         .into_iter()
         .map(Move::to_uci)
         .collect::<Vec<_>>();
@@ -223,5 +241,35 @@ mod tests {
         assert!(output.contains("a2a3"));
         assert!(output.contains("h2h4"));
         assert!(output.contains("total: 16"));
+    }
+
+    #[test]
+    fn movegen_knights_command_prints_starting_position_moves() {
+        let output = run([
+            "movegen".to_string(),
+            "knights".to_string(),
+            "--fen".to_string(),
+            "startpos".to_string(),
+        ])
+        .expect("movegen output");
+
+        assert!(output.contains("b1a3"));
+        assert!(output.contains("g1h3"));
+        assert!(output.contains("total: 4"));
+    }
+
+    #[test]
+    fn movegen_kings_command_prints_center_king_moves() {
+        let output = run([
+            "movegen".to_string(),
+            "kings".to_string(),
+            "--fen".to_string(),
+            "8/8/8/8/4K3/8/8/8 w - - 0 1".to_string(),
+        ])
+        .expect("movegen output");
+
+        assert!(output.contains("e4d3"));
+        assert!(output.contains("e4f5"));
+        assert!(output.contains("total: 8"));
     }
 }
