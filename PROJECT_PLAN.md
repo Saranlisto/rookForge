@@ -1,5 +1,7 @@
 # Rookforge Project Plan
 
+For the public execution ledger, see [EXECUTION_STATUS.md](EXECUTION_STATUS.md).
+
 ## Completed
 
 - Day 001: Initial Rust workspace, core and CLI crates, placeholder modules, README, docs, and Rust CI.

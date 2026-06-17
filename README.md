@@ -2,6 +2,8 @@
 
 Rookforge is a from-scratch chess engine project written in Rust. The goal is to build a correct, well-tested classical engine that can grow into a public engineering case study.
 
+For the current public execution ledger, see [EXECUTION_STATUS.md](EXECUTION_STATUS.md).
+
 ## Project Objective
 
 The project is focused on building a serious chess engine in measured stages:
@@ -33,6 +35,19 @@ Initial core modules:
 ## Current Status
 
 Rookforge is currently a production-grade scaffold with structural FEN parsing, board inspection helpers, UCI-style move parsing, combined pseudo-legal move generation, and local debug commands. It does not play chess yet.
+
+Execution completed to date:
+
+| Day | Completed |
+| --- | --- |
+| 001 | Rust workspace, core crate, CLI crate, placeholder modules, README, docs, and CI. |
+| 002 | FEN parsing, position initialization, tests, local validation script, and Makefile workflow. |
+| 003 | Square utilities, board helpers, pretty board display, FEN serialization, and board debug CLI. |
+| 004 | UCI-style move parsing, promotion support, tests, and move debug CLI. |
+| 005 | Pseudo-legal pawn move generation and pawn movegen CLI. |
+| 006 | Pseudo-legal knight and king move generation and related CLI commands. |
+| 007 | Pseudo-legal bishop, rook, and queen sliding move generation and related CLI commands. |
+| 008 | Combined all-piece pseudo-legal move generation and `movegen all`. |
 
 Implemented:
 
@@ -69,9 +84,9 @@ Intentionally not implemented yet:
 ## Roadmap
 
 1. Add make/unmake move structure.
-2. Add pseudo-legal move generation.
-3. Add legal move filtering and check detection.
-4. Add perft with known test positions.
+2. Add legal move filtering and check detection.
+3. Add perft with known test positions.
+4. Add castling and en passant move generation.
 5. Add UCI command loop.
 6. Add search and evaluation.
 7. Add benchmarks and strength testing.
