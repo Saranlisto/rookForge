@@ -137,3 +137,61 @@ fn movegen_kings_center_succeeds() {
     assert!(stdout.contains("e4f5"));
     assert!(stdout.contains("total: 8"));
 }
+
+#[test]
+fn movegen_bishops_center_succeeds() {
+    let output = Command::new(env!("CARGO_BIN_EXE_rookforge"))
+        .args(["movegen", "bishops", "--fen", "8/8/8/3B4/8/8/8/8 w - - 0 1"])
+        .output()
+        .expect("run rookforge movegen bishops --fen center bishop");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
+    assert!(stdout.contains("d5a2"));
+    assert!(stdout.contains("d5g8"));
+    assert!(stdout.contains("total: 13"));
+}
+
+#[test]
+fn movegen_rooks_center_succeeds() {
+    let output = Command::new(env!("CARGO_BIN_EXE_rookforge"))
+        .args(["movegen", "rooks", "--fen", "8/8/8/3R4/8/8/8/8 w - - 0 1"])
+        .output()
+        .expect("run rookforge movegen rooks --fen center rook");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
+    assert!(stdout.contains("d5a5"));
+    assert!(stdout.contains("d5d8"));
+    assert!(stdout.contains("total: 14"));
+}
+
+#[test]
+fn movegen_queens_center_succeeds() {
+    let output = Command::new(env!("CARGO_BIN_EXE_rookforge"))
+        .args(["movegen", "queens", "--fen", "8/8/8/3Q4/8/8/8/8 w - - 0 1"])
+        .output()
+        .expect("run rookforge movegen queens --fen center queen");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
+    assert!(stdout.contains("d5a2"));
+    assert!(stdout.contains("d5d8"));
+    assert!(stdout.contains("total: 27"));
+}
+
+#[test]
+fn movegen_all_startpos_succeeds() {
+    let output = Command::new(env!("CARGO_BIN_EXE_rookforge"))
+        .args(["movegen", "all", "--fen", "startpos"])
+        .output()
+        .expect("run rookforge movegen all --fen startpos");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
+    assert!(stdout.contains("a2a3"));
+    assert!(stdout.contains("b1c3"));
+    assert!(stdout.contains("g1f3"));
+    assert!(stdout.contains("h2h4"));
+    assert!(stdout.contains("total: 20"));
+}

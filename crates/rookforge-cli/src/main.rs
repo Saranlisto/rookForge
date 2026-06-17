@@ -2,8 +2,9 @@ use std::env;
 use std::process::ExitCode;
 
 use rookforge_core::{
-    generate_king_moves, generate_knight_moves, generate_pawn_moves, Move, PieceKind, Position,
-    ENGINE_NAME, STARTING_POSITION_FEN,
+    generate_bishop_moves, generate_king_moves, generate_knight_moves, generate_pawn_moves,
+    generate_pseudo_legal_moves, generate_queen_moves, generate_rook_moves, Move, PieceKind,
+    Position, ENGINE_NAME, STARTING_POSITION_FEN,
 };
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -38,6 +39,10 @@ fn run(args: impl IntoIterator<Item = String>) -> Result<String, String> {
         ["movegen", "pawns", "--fen", fen] => pawn_moves_from_fen(fen),
         ["movegen", "knights", "--fen", fen] => knight_moves_from_fen(fen),
         ["movegen", "kings", "--fen", fen] => king_moves_from_fen(fen),
+        ["movegen", "bishops", "--fen", fen] => bishop_moves_from_fen(fen),
+        ["movegen", "rooks", "--fen", fen] => rook_moves_from_fen(fen),
+        ["movegen", "queens", "--fen", fen] => queen_moves_from_fen(fen),
+        ["movegen", "all", "--fen", fen] => pseudo_legal_moves_from_fen(fen),
         ["movegen", ..] => Err("invalid movegen command. Try `rookforge movegen --help`.".into()),
         ["perft", "help"] | ["perft", "--help"] | ["perft", "-h"] => Ok(perft_help_text()),
         ["perft", ..] => Err("perft is not implemented yet. Try `rookforge perft --help`.".into()),
@@ -64,7 +69,7 @@ fn move_help_text() -> String {
 }
 
 fn movegen_help_text() -> String {
-    "rookforge movegen\n\nUSAGE:\n    rookforge movegen pawns --fen <FEN|startpos>\n    rookforge movegen knights --fen <FEN|startpos>\n    rookforge movegen kings --fen <FEN|startpos>\n\nSTATUS:\n    Generates selected pseudo-legal moves for local debugging.\n"
+    "rookforge movegen\n\nUSAGE:\n    rookforge movegen pawns --fen <FEN|startpos>\n    rookforge movegen knights --fen <FEN|startpos>\n    rookforge movegen kings --fen <FEN|startpos>\n    rookforge movegen bishops --fen <FEN|startpos>\n    rookforge movegen rooks --fen <FEN|startpos>\n    rookforge movegen queens --fen <FEN|startpos>\n    rookforge movegen all --fen <FEN|startpos>\n\nSTATUS:\n    Generates selected pseudo-legal moves for local debugging.\n"
         .to_string()
 }
 
@@ -101,6 +106,22 @@ fn knight_moves_from_fen(fen: &str) -> Result<String, String> {
 
 fn king_moves_from_fen(fen: &str) -> Result<String, String> {
     movegen_moves_from_fen(fen, generate_king_moves)
+}
+
+fn bishop_moves_from_fen(fen: &str) -> Result<String, String> {
+    movegen_moves_from_fen(fen, generate_bishop_moves)
+}
+
+fn rook_moves_from_fen(fen: &str) -> Result<String, String> {
+    movegen_moves_from_fen(fen, generate_rook_moves)
+}
+
+fn queen_moves_from_fen(fen: &str) -> Result<String, String> {
+    movegen_moves_from_fen(fen, generate_queen_moves)
+}
+
+fn pseudo_legal_moves_from_fen(fen: &str) -> Result<String, String> {
+    movegen_moves_from_fen(fen, generate_pseudo_legal_moves)
 }
 
 fn movegen_moves_from_fen(
@@ -271,5 +292,67 @@ mod tests {
         assert!(output.contains("e4d3"));
         assert!(output.contains("e4f5"));
         assert!(output.contains("total: 8"));
+    }
+
+    #[test]
+    fn movegen_bishops_command_prints_center_bishop_moves() {
+        let output = run([
+            "movegen".to_string(),
+            "bishops".to_string(),
+            "--fen".to_string(),
+            "8/8/8/3B4/8/8/8/8 w - - 0 1".to_string(),
+        ])
+        .expect("movegen output");
+
+        assert!(output.contains("d5a2"));
+        assert!(output.contains("d5g8"));
+        assert!(output.contains("total: 13"));
+    }
+
+    #[test]
+    fn movegen_rooks_command_prints_center_rook_moves() {
+        let output = run([
+            "movegen".to_string(),
+            "rooks".to_string(),
+            "--fen".to_string(),
+            "8/8/8/3R4/8/8/8/8 w - - 0 1".to_string(),
+        ])
+        .expect("movegen output");
+
+        assert!(output.contains("d5a5"));
+        assert!(output.contains("d5d8"));
+        assert!(output.contains("total: 14"));
+    }
+
+    #[test]
+    fn movegen_queens_command_prints_center_queen_moves() {
+        let output = run([
+            "movegen".to_string(),
+            "queens".to_string(),
+            "--fen".to_string(),
+            "8/8/8/3Q4/8/8/8/8 w - - 0 1".to_string(),
+        ])
+        .expect("movegen output");
+
+        assert!(output.contains("d5a2"));
+        assert!(output.contains("d5d8"));
+        assert!(output.contains("total: 27"));
+    }
+
+    #[test]
+    fn movegen_all_command_prints_starting_position_moves() {
+        let output = run([
+            "movegen".to_string(),
+            "all".to_string(),
+            "--fen".to_string(),
+            "startpos".to_string(),
+        ])
+        .expect("movegen output");
+
+        assert!(output.contains("a2a3"));
+        assert!(output.contains("b1c3"));
+        assert!(output.contains("g1f3"));
+        assert!(output.contains("h2h4"));
+        assert!(output.contains("total: 20"));
     }
 }

@@ -8,15 +8,16 @@
 - Day 004: UCI-style move representation, parsing, promotion normalization, CLI move debug command, and local smoke checks.
 - Day 005: Pseudo-legal pawn move generation for pushes, captures, double pushes, promotions, CLI pawn movegen debugging, and local smoke checks.
 - Day 006: Pseudo-legal knight and one-square king move generation, shared leaper occupancy handling, CLI debug commands, and local smoke checks.
+- Day 007: Pseudo-legal bishop, rook, and queen sliding move generation, shared ray traversal, CLI debug commands, and local smoke checks.
+- Day 008: Combined all-piece pseudo-legal move generation, start-position count of 20, CLI `movegen all`, and local smoke checks.
 
 ## Near-Term Plan
 
-1. Add pseudo-legal sliding piece move generation for bishops, rooks, and queens.
-2. Add make/unmake move scaffolding for board state transitions.
-3. Add legal move filtering and check detection.
-4. Add perft execution with known validation positions.
-5. Add castling and en passant once board state transitions are reliable.
-6. Add UCI protocol loop after core move generation is stable.
+1. Add make/unmake move scaffolding for board state transitions.
+2. Add legal move filtering and check detection.
+3. Add perft execution with known validation positions.
+4. Add castling and en passant once board state transitions are reliable.
+5. Add UCI protocol loop after core move generation is stable.
 
 ## Deferred
 

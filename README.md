@@ -32,7 +32,7 @@ Initial core modules:
 
 ## Current Status
 
-Rookforge is currently a production-grade scaffold with structural FEN parsing, board inspection helpers, UCI-style move parsing, pseudo-legal non-sliding move generation, and local debug commands. It does not play chess yet.
+Rookforge is currently a production-grade scaffold with structural FEN parsing, board inspection helpers, UCI-style move parsing, combined pseudo-legal move generation, and local debug commands. It does not play chess yet.
 
 Implemented:
 
@@ -47,6 +47,8 @@ Implemented:
 - UCI-style move parsing and serialization such as `e2e4` and `e7e8q`
 - Pseudo-legal pawn move generation for pushes, captures, double pushes, and promotions
 - Pseudo-legal knight and one-square king move generation
+- Pseudo-legal bishop, rook, and queen sliding move generation
+- Combined all-piece pseudo-legal move generation for pawns, knights, bishops, rooks, queens, and kings
 - Human-readable board display for debugging
 - Unit tests for the placeholder types
 - CLI tests for basic command behavior
@@ -57,7 +59,6 @@ Implemented:
 Intentionally not implemented yet:
 
 - Legal move generation
-- Sliding piece move generation
 - Castling
 - En passant
 - Perft execution
@@ -96,6 +97,10 @@ cargo run -- move --parse e7e8q
 cargo run -- movegen pawns --fen startpos
 cargo run -- movegen knights --fen startpos
 cargo run -- movegen kings --fen "8/8/8/8/4K3/8/8/8 w - - 0 1"
+cargo run -- movegen bishops --fen "8/8/8/3B4/8/8/8/8 w - - 0 1"
+cargo run -- movegen rooks --fen "8/8/8/3R4/8/8/8/8 w - - 0 1"
+cargo run -- movegen queens --fen "8/8/8/3Q4/8/8/8/8 w - - 0 1"
+cargo run -- movegen all --fen startpos
 ```
 
 ## Build And Test
@@ -118,4 +123,8 @@ rookforge move --parse e2e4
 rookforge movegen pawns --fen startpos
 rookforge movegen knights --fen startpos
 rookforge movegen kings --fen "8/8/8/8/4K3/8/8/8 w - - 0 1"
+rookforge movegen bishops --fen "8/8/8/3B4/8/8/8/8 w - - 0 1"
+rookforge movegen rooks --fen "8/8/8/3R4/8/8/8/8 w - - 0 1"
+rookforge movegen queens --fen "8/8/8/3Q4/8/8/8/8 w - - 0 1"
+rookforge movegen all --fen startpos
 ```

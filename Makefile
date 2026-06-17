@@ -23,6 +23,10 @@ smoke:
 	cargo run -- movegen pawns --fen startpos
 	cargo run -- movegen knights --fen startpos
 	cargo run -- movegen kings --fen "8/8/8/8/4K3/8/8/8 w - - 0 1"
+	cargo run -- movegen bishops --fen "8/8/8/3B4/8/8/8/8 w - - 0 1"
+	cargo run -- movegen rooks --fen "8/8/8/3R4/8/8/8/8 w - - 0 1"
+	cargo run -- movegen queens --fen "8/8/8/3Q4/8/8/8/8 w - - 0 1"
+	cargo run -- movegen all --fen startpos
 
 check:
 	./scripts/local-check.sh
