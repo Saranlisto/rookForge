@@ -73,7 +73,7 @@ pub fn generate_knight_moves(position: &Position) -> Vec<Move> {
 
 /// Generates pseudo-legal one-square king moves for the side to move.
 ///
-/// Castling and attacked-square checks are intentionally not implemented here.
+/// Castling and attacked-square checks are handled by legal move generation.
 #[must_use]
 pub fn generate_king_moves(position: &Position) -> Vec<Move> {
     generate_leaper_moves(position, PieceKind::King, &KING_DELTAS)
@@ -156,8 +156,10 @@ pub fn is_in_check(position: &Position, color: Color) -> bool {
 #[must_use]
 pub fn generate_legal_moves(position: &Position) -> Vec<Move> {
     let moving_side = position.side_to_move();
+    let mut moves = generate_pseudo_legal_moves(position);
+    moves.extend(generate_castling_moves(position));
 
-    generate_pseudo_legal_moves(position)
+    moves
         .into_iter()
         .filter(|&mv| !targets_opponent_king(position, mv))
         .filter_map(|mv| {
@@ -167,6 +169,87 @@ pub fn generate_legal_moves(position: &Position) -> Vec<Move> {
                 .map(|_| mv)
         })
         .collect()
+}
+
+/// Generates currently legal castling moves for the side to move.
+///
+/// Castling is represented with normal king moves: `e1g1`, `e1c1`, `e8g8`,
+/// and `e8c8`.
+#[must_use]
+pub fn generate_castling_moves(position: &Position) -> Vec<Move> {
+    let color = position.side_to_move();
+
+    if is_in_check(position, color) {
+        return Vec::new();
+    }
+
+    let mut moves = Vec::new();
+    let rights = position.castling_rights();
+
+    match color {
+        Color::White => {
+            if rights.white_kingside {
+                add_castling_move_if_legal(
+                    position,
+                    color,
+                    square("e1"),
+                    square("h1"),
+                    CastlingPath {
+                        empty_squares: &[square("f1"), square("g1")],
+                        safe_squares: &[square("f1"), square("g1")],
+                        king_to: square("g1"),
+                    },
+                    &mut moves,
+                );
+            }
+            if rights.white_queenside {
+                add_castling_move_if_legal(
+                    position,
+                    color,
+                    square("e1"),
+                    square("a1"),
+                    CastlingPath {
+                        empty_squares: &[square("d1"), square("c1"), square("b1")],
+                        safe_squares: &[square("d1"), square("c1")],
+                        king_to: square("c1"),
+                    },
+                    &mut moves,
+                );
+            }
+        }
+        Color::Black => {
+            if rights.black_kingside {
+                add_castling_move_if_legal(
+                    position,
+                    color,
+                    square("e8"),
+                    square("h8"),
+                    CastlingPath {
+                        empty_squares: &[square("f8"), square("g8")],
+                        safe_squares: &[square("f8"), square("g8")],
+                        king_to: square("g8"),
+                    },
+                    &mut moves,
+                );
+            }
+            if rights.black_queenside {
+                add_castling_move_if_legal(
+                    position,
+                    color,
+                    square("e8"),
+                    square("a8"),
+                    CastlingPath {
+                        empty_squares: &[square("d8"), square("c8"), square("b8")],
+                        safe_squares: &[square("d8"), square("c8")],
+                        king_to: square("c8"),
+                    },
+                    &mut moves,
+                );
+            }
+        }
+    }
+
+    moves
 }
 
 /// Counts legal move-tree leaf nodes to `depth`.
@@ -233,7 +316,12 @@ pub fn apply_move(position: &Position, mv: Move) -> Result<Position, MoveApplyEr
     let moving_piece = position
         .piece_at(mv.from)
         .ok_or(MoveApplyError::EmptySourceSquare { source: mv.from })?;
-    let captured_piece = position.piece_at(mv.to);
+    let castling_rook_move = castling_rook_move(moving_piece, mv);
+    let captured_piece = if castling_rook_move.is_some() {
+        None
+    } else {
+        position.piece_at(mv.to)
+    };
     let placed_piece = piece_after_promotion(moving_piece, mv.promotion)?;
     let moving_side = position.side_to_move();
 
@@ -247,6 +335,23 @@ pub fn apply_move(position: &Position, mv: Move) -> Result<Position, MoveApplyEr
 
     next.clear_square(mv.from);
     next.set_piece(mv.to, placed_piece);
+
+    if let Some((rook_from, rook_to)) = castling_rook_move {
+        let rook = position
+            .piece_at(rook_from)
+            .ok_or(MoveApplyError::MissingCastlingRook { source: rook_from })?;
+
+        if rook != Piece::new(moving_piece.color, PieceKind::Rook) {
+            return Err(MoveApplyError::InvalidCastlingRook {
+                source: rook_from,
+                found: rook,
+            });
+        }
+
+        next.clear_square(rook_from);
+        next.set_piece(rook_to, rook);
+    }
+
     next.set_castling_rights(castling_rights);
     next.set_en_passant_target(en_passant_target_after_move(moving_piece, mv));
 
@@ -347,6 +452,28 @@ fn update_castling_rights_for_capture(
             rights.black_queenside = false;
         }
         _ => {}
+    }
+}
+
+fn castling_rook_move(moving_piece: Piece, mv: Move) -> Option<(Square, Square)> {
+    if moving_piece.kind != PieceKind::King || mv.from.rank() != mv.to.rank() {
+        return None;
+    }
+
+    match (moving_piece.color, mv.from, mv.to) {
+        (Color::White, from, to) if from == square("e1") && to == square("g1") => {
+            Some((square("h1"), square("f1")))
+        }
+        (Color::White, from, to) if from == square("e1") && to == square("c1") => {
+            Some((square("a1"), square("d1")))
+        }
+        (Color::Black, from, to) if from == square("e8") && to == square("g8") => {
+            Some((square("h8"), square("f8")))
+        }
+        (Color::Black, from, to) if from == square("e8") && to == square("c8") => {
+            Some((square("a8"), square("d8")))
+        }
+        _ => None,
     }
 }
 
@@ -452,6 +579,47 @@ fn add_leaper_moves_from(
 
 fn can_land_on(position: &Position, color: Color, target: Square) -> bool {
     !matches!(position.piece_at(target), Some(piece) if piece.color == color)
+}
+
+struct CastlingPath<'a> {
+    empty_squares: &'a [Square],
+    safe_squares: &'a [Square],
+    king_to: Square,
+}
+
+fn add_castling_move_if_legal(
+    position: &Position,
+    color: Color,
+    king_from: Square,
+    rook_from: Square,
+    path: CastlingPath<'_>,
+    moves: &mut Vec<Move>,
+) {
+    if position.piece_at(king_from) != Some(Piece::new(color, PieceKind::King)) {
+        return;
+    }
+
+    if position.piece_at(rook_from) != Some(Piece::new(color, PieceKind::Rook)) {
+        return;
+    }
+
+    if path
+        .empty_squares
+        .iter()
+        .any(|&square| position.piece_at(square).is_some())
+    {
+        return;
+    }
+
+    if path
+        .safe_squares
+        .iter()
+        .any(|&square| is_square_attacked(position, square, color.opposite()))
+    {
+        return;
+    }
+
+    moves.push(Move::quiet(king_from, path.king_to));
 }
 
 fn targets_opponent_king(position: &Position, mv: Move) -> bool {
@@ -760,6 +928,8 @@ pub enum MoveApplyError {
     EmptySourceSquare { source: Square },
     InvalidPromotionPiece(PieceKind),
     PromotionWithoutPawn { source_kind: PieceKind },
+    MissingCastlingRook { source: Square },
+    InvalidCastlingRook { source: Square, found: Piece },
 }
 
 impl fmt::Display for MoveApplyError {
@@ -779,6 +949,20 @@ impl fmt::Display for MoveApplyError {
                 write!(
                     formatter,
                     "promotion requested for non-pawn source piece `{source_kind:?}`"
+                )
+            }
+            Self::MissingCastlingRook { source } => {
+                write!(
+                    formatter,
+                    "castling rook source `{}` is empty",
+                    source.to_algebraic()
+                )
+            }
+            Self::InvalidCastlingRook { source, found } => {
+                write!(
+                    formatter,
+                    "castling rook source `{}` contains `{found:?}`",
+                    source.to_algebraic()
                 )
             }
         }
@@ -835,6 +1019,10 @@ mod tests {
 
     fn legal_moves_from_fen(fen: &str) -> Vec<String> {
         moves_from_fen(fen, generate_legal_moves)
+    }
+
+    fn castling_moves_from_fen(fen: &str) -> Vec<String> {
+        moves_from_fen(fen, generate_castling_moves)
     }
 
     fn perft_from_fen(fen: &str, depth: u32) -> u64 {
@@ -2186,5 +2374,171 @@ mod tests {
     #[test]
     fn perft_pinned_piece_position_excludes_illegal_exposures() {
         assert_eq!(perft_from_fen("k3r3/8/8/8/8/8/4R3/4K3 w - - 0 1", 1), 10);
+    }
+
+    #[test]
+    fn white_kingside_castling_is_generated() {
+        let moves = castling_moves_from_fen("r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1");
+
+        assert!(moves.contains(&"e1g1".to_string()));
+    }
+
+    #[test]
+    fn white_queenside_castling_is_generated() {
+        let moves = castling_moves_from_fen("r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1");
+
+        assert!(moves.contains(&"e1c1".to_string()));
+    }
+
+    #[test]
+    fn black_kingside_castling_is_generated() {
+        let moves = castling_moves_from_fen("r3k2r/8/8/8/8/8/8/R3K2R b KQkq - 0 1");
+
+        assert!(moves.contains(&"e8g8".to_string()));
+    }
+
+    #[test]
+    fn black_queenside_castling_is_generated() {
+        let moves = castling_moves_from_fen("r3k2r/8/8/8/8/8/8/R3K2R b KQkq - 0 1");
+
+        assert!(moves.contains(&"e8c8".to_string()));
+    }
+
+    #[test]
+    fn castling_is_not_generated_without_castling_rights() {
+        assert_eq!(
+            castling_moves_from_fen("r3k2r/8/8/8/8/8/8/R3K2R w - - 0 1"),
+            Vec::<String>::new()
+        );
+    }
+
+    #[test]
+    fn castling_is_not_generated_when_pieces_are_between_king_and_rook() {
+        let moves = castling_moves_from_fen(crate::board::STARTING_POSITION_FEN);
+
+        assert!(!moves.contains(&"e1g1".to_string()));
+        assert!(!moves.contains(&"e1c1".to_string()));
+    }
+
+    #[test]
+    fn castling_is_not_generated_when_king_is_in_check() {
+        let moves = castling_moves_from_fen("k3r2r/8/8/8/8/8/8/R3K2R w KQ - 0 1");
+
+        assert!(!moves.contains(&"e1g1".to_string()));
+        assert!(!moves.contains(&"e1c1".to_string()));
+    }
+
+    #[test]
+    fn castling_is_not_generated_when_transit_square_is_attacked() {
+        let moves = castling_moves_from_fen("k4r2/8/8/8/8/8/8/R3K2R w KQ - 0 1");
+
+        assert!(!moves.contains(&"e1g1".to_string()));
+    }
+
+    #[test]
+    fn castling_is_not_generated_when_destination_square_is_attacked() {
+        let moves = castling_moves_from_fen("k5r1/8/8/8/8/8/8/R3K2R w KQ - 0 1");
+
+        assert!(!moves.contains(&"e1g1".to_string()));
+    }
+
+    #[test]
+    fn applying_white_kingside_castling_moves_rook() {
+        let result = apply_move_from_uci("r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 7 1", "e1g1")
+            .expect("castling applies");
+
+        assert_eq!(
+            result.piece_at(square("g1")),
+            Some(Piece::new(Color::White, PieceKind::King))
+        );
+        assert_eq!(
+            result.piece_at(square("f1")),
+            Some(Piece::new(Color::White, PieceKind::Rook))
+        );
+        assert_eq!(result.piece_at(square("e1")), None);
+        assert_eq!(result.piece_at(square("h1")), None);
+    }
+
+    #[test]
+    fn applying_white_queenside_castling_moves_rook() {
+        let result = apply_move_from_uci("r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 7 1", "e1c1")
+            .expect("castling applies");
+
+        assert_eq!(
+            result.piece_at(square("c1")),
+            Some(Piece::new(Color::White, PieceKind::King))
+        );
+        assert_eq!(
+            result.piece_at(square("d1")),
+            Some(Piece::new(Color::White, PieceKind::Rook))
+        );
+        assert_eq!(result.piece_at(square("e1")), None);
+        assert_eq!(result.piece_at(square("a1")), None);
+    }
+
+    #[test]
+    fn applying_black_kingside_castling_moves_rook() {
+        let result = apply_move_from_uci("r3k2r/8/8/8/8/8/8/R3K2R b KQkq - 7 1", "e8g8")
+            .expect("castling applies");
+
+        assert_eq!(
+            result.piece_at(square("g8")),
+            Some(Piece::new(Color::Black, PieceKind::King))
+        );
+        assert_eq!(
+            result.piece_at(square("f8")),
+            Some(Piece::new(Color::Black, PieceKind::Rook))
+        );
+        assert_eq!(result.piece_at(square("e8")), None);
+        assert_eq!(result.piece_at(square("h8")), None);
+    }
+
+    #[test]
+    fn applying_black_queenside_castling_moves_rook() {
+        let result = apply_move_from_uci("r3k2r/8/8/8/8/8/8/R3K2R b KQkq - 7 1", "e8c8")
+            .expect("castling applies");
+
+        assert_eq!(
+            result.piece_at(square("c8")),
+            Some(Piece::new(Color::Black, PieceKind::King))
+        );
+        assert_eq!(
+            result.piece_at(square("d8")),
+            Some(Piece::new(Color::Black, PieceKind::Rook))
+        );
+        assert_eq!(result.piece_at(square("e8")), None);
+        assert_eq!(result.piece_at(square("a8")), None);
+    }
+
+    #[test]
+    fn castling_removes_castling_rights_for_that_color() {
+        let result = apply_move_from_uci("r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 7 1", "e1g1")
+            .expect("castling applies");
+
+        assert_eq!(
+            result.castling_rights(),
+            CastlingRights {
+                white_kingside: false,
+                white_queenside: false,
+                black_kingside: true,
+                black_queenside: true,
+            }
+        );
+    }
+
+    #[test]
+    fn castling_increments_halfmove_clock() {
+        let result = apply_move_from_uci("r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 7 1", "e1g1")
+            .expect("castling applies");
+
+        assert_eq!(result.halfmove_clock(), 8);
+    }
+
+    #[test]
+    fn legal_moves_include_castling() {
+        let moves = legal_moves_from_fen("r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1");
+
+        assert!(moves.contains(&"e1g1".to_string()));
+        assert!(moves.contains(&"e1c1".to_string()));
     }
 }

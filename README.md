@@ -34,7 +34,7 @@ Initial core modules:
 
 ## Current Status
 
-Rookforge is currently a production-grade scaffold with structural FEN parsing, board inspection helpers, UCI-style move parsing, combined pseudo-legal move generation, basic move application, attack detection, legal move filtering, basic perft, and local debug commands. It does not play chess yet.
+Rookforge is currently a production-grade scaffold with structural FEN parsing, board inspection helpers, UCI-style move parsing, combined pseudo-legal move generation, basic move application, attack detection, legal move filtering, castling, basic perft, and local debug commands. It does not play chess yet.
 
 Execution completed to date:
 
@@ -52,6 +52,7 @@ Execution completed to date:
 | 010 | Attack detection for pawns, knights, kings, sliders, queens, blockers, and CLI attack inspection. |
 | 011 | King lookup, check detection, legal move filtering, and `movegen legal`. |
 | 012 | Recursive legal-move perft, start-position node tests, and `perft --fen ... --depth ...`. |
+| 013 | Castling generation, castling legality checks, castling application, and castling smoke coverage. |
 
 Implemented:
 
@@ -72,6 +73,7 @@ Implemented:
 - Attack detection for pawns, knights, kings, bishops, rooks, queens, and blockers
 - King lookup and check detection
 - Legal move filtering by applying pseudo-legal moves and rejecting king-unsafe results
+- Castling generation and application using normal king moves
 - Basic recursive perft using legal moves
 - Human-readable board display for debugging
 - Unit tests for the placeholder types
@@ -82,7 +84,6 @@ Implemented:
 
 Intentionally not implemented yet:
 
-- Castling execution
 - En passant capture
 - Unapply/reversible move history
 - Perft divide mode
@@ -92,14 +93,13 @@ Intentionally not implemented yet:
 
 ## Roadmap
 
-1. Add castling generation and application.
-2. Add en passant generation and application.
-3. Add a hardened perft validation suite and divide mode.
-4. Add reversible move history and unapply scaffolding.
-5. Add UCI command loop.
-6. Add search and evaluation.
-7. Add benchmarks and strength testing.
-8. Add Lichess bot bridge after the core engine is stable.
+1. Add en passant generation and application.
+2. Add a hardened perft validation suite and divide mode.
+3. Add reversible move history and unapply scaffolding.
+4. Add UCI command loop.
+5. Add search and evaluation.
+6. Add benchmarks and strength testing.
+7. Add Lichess bot bridge after the core engine is stable.
 
 ## Local Development
 
@@ -128,6 +128,7 @@ cargo run -- movegen rooks --fen "8/8/8/3R4/8/8/8/8 w - - 0 1"
 cargo run -- movegen queens --fen "8/8/8/3Q4/8/8/8/8 w - - 0 1"
 cargo run -- movegen all --fen startpos
 cargo run -- movegen legal --fen startpos
+cargo run -- movegen legal --fen "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1"
 cargo run -- apply --fen startpos --move e2e4
 cargo run -- attacks --fen "4r3/8/8/8/4K3/8/8/8 w - - 0 1" --square e4 --by black
 cargo run -- attacks --fen startpos --square e4 --by black
@@ -161,6 +162,7 @@ rookforge movegen rooks --fen "8/8/8/3R4/8/8/8/8 w - - 0 1"
 rookforge movegen queens --fen "8/8/8/3Q4/8/8/8/8 w - - 0 1"
 rookforge movegen all --fen startpos
 rookforge movegen legal --fen startpos
+rookforge movegen legal --fen "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1"
 rookforge apply --fen startpos --move e2e4
 rookforge attacks --fen "4r3/8/8/8/4K3/8/8/8 w - - 0 1" --square e4 --by black
 rookforge attacks --fen startpos --square e4 --by black

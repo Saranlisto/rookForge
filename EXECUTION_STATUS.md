@@ -4,7 +4,7 @@ This file is the public progress ledger for Rookforge. It summarizes what has be
 
 ## Current Snapshot
 
-Rookforge is in the early engine-core phase. The repository can parse positions, inspect boards, parse UCI-style moves, generate pseudo-legal moves for all piece types, apply basic moves to create a new position, detect attacked squares, filter legal moves, and run basic perft. It does not yet implement all chess rules or play through UCI.
+Rookforge is in the early engine-core phase. The repository can parse positions, inspect boards, parse UCI-style moves, generate pseudo-legal moves for all piece types, apply basic moves to create a new position, detect attacked squares, filter legal moves, execute castling, and run basic perft. It does not yet implement all chess rules or play through UCI.
 
 ## Completed Work
 
@@ -22,6 +22,7 @@ Rookforge is in the early engine-core phase. The repository can parse positions,
 | 010 | Attack detection | Added `is_square_attacked`, pawn/leaper/slider/queen/blocker coverage, side-to-move-independent tests, and `rookforge attacks`. |
 | 011 | Legal filtering | Added `find_king`, `is_in_check`, `generate_legal_moves`, check-detection tests, legal move filtering tests, and `rookforge movegen legal`. |
 | 012 | Basic perft | Added recursive legal-move `perft`, start-position depth 1 and 2 tests, pinned-piece perft coverage, and `rookforge perft --fen ... --depth ...`. |
+| 013 | Castling | Added castling generation, castling attack/path legality checks, castling move application, castling-right updates, tests, and castling smoke checks. |
 
 ## Public Commands Available
 
@@ -41,6 +42,7 @@ rookforge movegen rooks --fen "8/8/8/3R4/8/8/8/8 w - - 0 1"
 rookforge movegen queens --fen "8/8/8/3Q4/8/8/8/8 w - - 0 1"
 rookforge movegen all --fen startpos
 rookforge movegen legal --fen startpos
+rookforge movegen legal --fen "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1"
 rookforge apply --fen startpos --move e2e4
 rookforge attacks --fen "4r3/8/8/8/4K3/8/8/8 w - - 0 1" --square e4 --by black
 rookforge attacks --fen startpos --square e4 --by black
@@ -57,7 +59,6 @@ This runs formatting checks, clippy with warnings treated as errors, tests, buil
 
 ## Intentionally Not Implemented Yet
 
-- Castling execution
 - En passant capture
 - Unapply move transitions
 - Reversible move history
@@ -71,4 +72,4 @@ This runs formatting checks, clippy with warnings treated as errors, tests, buil
 
 ## Next Recommended Execution
 
-Day 013 should add castling generation, castling legality checks, and castling move application.
+Day 014 should add en passant generation, en passant capture application, and legal filtering for en passant discovered-check cases.
