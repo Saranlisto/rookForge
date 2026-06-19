@@ -132,6 +132,37 @@ pub fn generate_pseudo_legal_moves(position: &Position) -> Vec<Move> {
     moves
 }
 
+/// Returns true when `square` is attacked by any piece of `by_color`.
+///
+/// This ignores side to move, does not mutate the position, and does not check
+/// whether either side's king is legally safe.
+#[must_use]
+pub fn is_square_attacked(position: &Position, square: Square, by_color: Color) -> bool {
+    is_attacked_by_pawn(position, square, by_color)
+        || is_attacked_by_leaper(
+            position,
+            square,
+            by_color,
+            PieceKind::Knight,
+            &KNIGHT_DELTAS,
+        )
+        || is_attacked_by_leaper(position, square, by_color, PieceKind::King, &KING_DELTAS)
+        || is_attacked_by_slider(
+            position,
+            square,
+            by_color,
+            &BISHOP_DIRECTIONS,
+            PieceKind::Bishop,
+        )
+        || is_attacked_by_slider(
+            position,
+            square,
+            by_color,
+            &ROOK_DIRECTIONS,
+            PieceKind::Rook,
+        )
+}
+
 /// Applies a structurally valid move to a position and returns the resulting position.
 ///
 /// This does not check whether the move is pseudo-legal or legal. It only moves
@@ -260,6 +291,71 @@ fn update_castling_rights_for_capture(
 
 fn square(value: &str) -> Square {
     Square::from_algebraic(value).expect("hard-coded square is valid")
+}
+
+fn is_attacked_by_pawn(position: &Position, square: Square, by_color: Color) -> bool {
+    for file_delta in [-1, 1] {
+        let Some(source) =
+            offset_square(square, file_delta, pawn_attack_source_rank_delta(by_color))
+        else {
+            continue;
+        };
+
+        if position.piece_at(source) == Some(Piece::new(by_color, PieceKind::Pawn)) {
+            return true;
+        }
+    }
+
+    false
+}
+
+fn pawn_attack_source_rank_delta(color: Color) -> i8 {
+    match color {
+        Color::White => -1,
+        Color::Black => 1,
+    }
+}
+
+fn is_attacked_by_leaper(
+    position: &Position,
+    square: Square,
+    by_color: Color,
+    kind: PieceKind,
+    deltas: &[(i8, i8)],
+) -> bool {
+    deltas.iter().any(|&(file_delta, rank_delta)| {
+        offset_square(square, file_delta, rank_delta).and_then(|source| position.piece_at(source))
+            == Some(Piece::new(by_color, kind))
+    })
+}
+
+fn is_attacked_by_slider(
+    position: &Position,
+    square: Square,
+    by_color: Color,
+    directions: &[(i8, i8)],
+    primary_kind: PieceKind,
+) -> bool {
+    for &(file_delta, rank_delta) in directions {
+        let mut current = square;
+
+        while let Some(source) = offset_square(current, file_delta, rank_delta) {
+            let Some(piece) = position.piece_at(source) else {
+                current = source;
+                continue;
+            };
+
+            if piece.color == by_color
+                && (piece.kind == primary_kind || piece.kind == PieceKind::Queen)
+            {
+                return true;
+            }
+
+            break;
+        }
+    }
+
+    false
 }
 
 fn generate_leaper_moves(position: &Position, kind: PieceKind, deltas: &[(i8, i8)]) -> Vec<Move> {
@@ -677,6 +773,13 @@ mod tests {
         let mv = Move::from_uci(value).expect("valid test move");
 
         apply_move(&position, mv)
+    }
+
+    fn square_attacked(fen: &str, target: &str, by_color: Color) -> bool {
+        let position = Position::from_fen(fen).expect("valid test FEN");
+        let target = square(target);
+
+        is_square_attacked(&position, target, by_color)
     }
 
     fn sorted_moves(values: &[&str]) -> Vec<String> {
@@ -1694,5 +1797,178 @@ mod tests {
 
             assert_eq!(result.castling_rights(), expected_rights);
         }
+    }
+
+    #[test]
+    fn white_pawn_attacks_diagonally_upward() {
+        assert!(square_attacked(
+            "8/8/4P3/8/8/8/8/8 b - - 0 1",
+            "d7",
+            Color::White
+        ));
+        assert!(square_attacked(
+            "8/8/4P3/8/8/8/8/8 b - - 0 1",
+            "f7",
+            Color::White
+        ));
+        assert!(!square_attacked(
+            "8/8/4P3/8/8/8/8/8 b - - 0 1",
+            "e7",
+            Color::White
+        ));
+    }
+
+    #[test]
+    fn black_pawn_attacks_diagonally_downward() {
+        assert!(square_attacked(
+            "8/8/8/4p3/8/8/8/8 w - - 0 1",
+            "d4",
+            Color::Black
+        ));
+        assert!(square_attacked(
+            "8/8/8/4p3/8/8/8/8 w - - 0 1",
+            "f4",
+            Color::Black
+        ));
+        assert!(!square_attacked(
+            "8/8/8/4p3/8/8/8/8 w - - 0 1",
+            "e4",
+            Color::Black
+        ));
+    }
+
+    #[test]
+    fn pawn_edge_file_attacks_stay_on_board() {
+        assert!(square_attacked(
+            "8/8/8/8/8/8/P6p/8 w - - 0 1",
+            "b3",
+            Color::White
+        ));
+        assert!(square_attacked(
+            "8/8/8/8/8/8/P6p/8 w - - 0 1",
+            "g1",
+            Color::Black
+        ));
+        assert!(!square_attacked(
+            "8/8/8/8/8/8/P6p/8 w - - 0 1",
+            "a3",
+            Color::White
+        ));
+    }
+
+    #[test]
+    fn knight_attacks_from_center() {
+        let fen = "8/8/8/8/4N3/8/8/8 b - - 0 1";
+
+        for target in ["c3", "c5", "d2", "d6", "f2", "f6", "g3", "g5"] {
+            assert!(square_attacked(fen, target, Color::White));
+        }
+
+        assert!(!square_attacked(fen, "e6", Color::White));
+    }
+
+    #[test]
+    fn knight_attack_detection_handles_edges() {
+        let fen = "8/8/8/8/8/8/8/N7 b - - 0 1";
+
+        assert!(square_attacked(fen, "b3", Color::White));
+        assert!(square_attacked(fen, "c2", Color::White));
+        assert!(!square_attacked(fen, "a2", Color::White));
+    }
+
+    #[test]
+    fn king_attacks_adjacent_squares() {
+        let fen = "8/8/8/8/4K3/8/8/8 b - - 0 1";
+
+        assert!(square_attacked(fen, "d5", Color::White));
+        assert!(square_attacked(fen, "e5", Color::White));
+        assert!(square_attacked(fen, "f3", Color::White));
+        assert!(!square_attacked(fen, "e6", Color::White));
+    }
+
+    #[test]
+    fn bishop_attacks_diagonally() {
+        assert!(square_attacked(
+            "8/8/7B/8/8/8/8/8 b - - 0 1",
+            "e3",
+            Color::White
+        ));
+    }
+
+    #[test]
+    fn bishop_attack_is_blocked_by_intervening_piece() {
+        assert!(!square_attacked(
+            "8/8/8/8/8/8/3P4/2B5 b - - 0 1",
+            "h6",
+            Color::White
+        ));
+    }
+
+    #[test]
+    fn rook_attacks_file_and_rank() {
+        let fen = "8/8/8/8/3R4/8/8/8 b - - 0 1";
+
+        assert!(square_attacked(fen, "d8", Color::White));
+        assert!(square_attacked(fen, "a4", Color::White));
+        assert!(!square_attacked(fen, "a8", Color::White));
+    }
+
+    #[test]
+    fn rook_attack_is_blocked_by_intervening_piece() {
+        assert!(!square_attacked(
+            "8/8/3P4/8/3R4/8/8/8 b - - 0 1",
+            "d8",
+            Color::White
+        ));
+    }
+
+    #[test]
+    fn queen_attacks_diagonally() {
+        assert!(square_attacked(
+            "8/8/8/8/3Q4/8/8/8 b - - 0 1",
+            "g7",
+            Color::White
+        ));
+    }
+
+    #[test]
+    fn queen_attacks_orthogonally() {
+        assert!(square_attacked(
+            "8/8/8/8/3Q4/8/8/8 b - - 0 1",
+            "d8",
+            Color::White
+        ));
+    }
+
+    #[test]
+    fn queen_attack_is_blocked_by_intervening_piece() {
+        assert!(!square_attacked(
+            "8/8/8/4P3/3Q4/8/8/8 b - - 0 1",
+            "g7",
+            Color::White
+        ));
+    }
+
+    #[test]
+    fn empty_board_has_no_attacks() {
+        assert!(!square_attacked(
+            "8/8/8/8/8/8/8/8 w - - 0 1",
+            "e4",
+            Color::White
+        ));
+        assert!(!square_attacked(
+            "8/8/8/8/8/8/8/8 w - - 0 1",
+            "e4",
+            Color::Black
+        ));
+    }
+
+    #[test]
+    fn attack_detection_ignores_side_to_move() {
+        assert!(square_attacked(
+            "4k3/8/8/8/4R3/8/8/4K3 b - - 0 1",
+            "e8",
+            Color::White
+        ));
     }
 }

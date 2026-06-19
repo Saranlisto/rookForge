@@ -4,7 +4,8 @@ use std::process::ExitCode;
 use rookforge_core::{
     apply_move, generate_bishop_moves, generate_king_moves, generate_knight_moves,
     generate_pawn_moves, generate_pseudo_legal_moves, generate_queen_moves, generate_rook_moves,
-    Move, PieceKind, Position, ENGINE_NAME, STARTING_POSITION_FEN,
+    is_square_attacked, Color, Move, PieceKind, Position, Square, ENGINE_NAME,
+    STARTING_POSITION_FEN,
 };
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -32,6 +33,11 @@ fn run(args: impl IntoIterator<Item = String>) -> Result<String, String> {
         ["apply", "help"] | ["apply", "--help"] | ["apply", "-h"] => Ok(apply_help_text()),
         ["apply", "--fen", fen, "--move", value] => apply_move_from_fen(fen, value),
         ["apply", ..] => Err("invalid apply command. Try `rookforge apply --help`.".into()),
+        ["attacks", "help"] | ["attacks", "--help"] | ["attacks", "-h"] => Ok(attacks_help_text()),
+        ["attacks", "--fen", fen, "--square", square, "--by", color] => {
+            attacks_from_fen(fen, square, color)
+        }
+        ["attacks", ..] => Err("invalid attacks command. Try `rookforge attacks --help`.".into()),
         ["board", "help"] | ["board", "--help"] | ["board", "-h"] => Ok(board_help_text()),
         ["board", "--fen", fen] => board_from_fen(fen),
         ["board", ..] => Err("invalid board command. Try `rookforge board --help`.".into()),
@@ -57,12 +63,17 @@ fn run(args: impl IntoIterator<Item = String>) -> Result<String, String> {
 
 fn help_text() -> String {
     format!(
-        "{ENGINE_NAME} chess engine scaffold\n\nUSAGE:\n    rookforge <COMMAND>\n\nCOMMANDS:\n    apply       Apply a move to a FEN position\n    board       Print a FEN position as a board\n    help        Show this help text\n    move        Parse a UCI-style move\n    movegen     Generate selected pseudo-legal moves\n    perft       Inspect perft command options\n\nOPTIONS:\n    -h, --help      Show this help text\n    -V, --version   Show version information\n"
+        "{ENGINE_NAME} chess engine scaffold\n\nUSAGE:\n    rookforge <COMMAND>\n\nCOMMANDS:\n    apply       Apply a move to a FEN position\n    attacks     Check whether a square is attacked\n    board       Print a FEN position as a board\n    help        Show this help text\n    move        Parse a UCI-style move\n    movegen     Generate selected pseudo-legal moves\n    perft       Inspect perft command options\n\nOPTIONS:\n    -h, --help      Show this help text\n    -V, --version   Show version information\n"
     )
 }
 
 fn apply_help_text() -> String {
     "rookforge apply\n\nUSAGE:\n    rookforge apply --fen <FEN|startpos> --move <MOVE>\n\nSTATUS:\n    Applies a structurally parsed move to a FEN position for local debugging.\n"
+        .to_string()
+}
+
+fn attacks_help_text() -> String {
+    "rookforge attacks\n\nUSAGE:\n    rookforge attacks --fen <FEN|startpos> --square <SQUARE> --by <white|black>\n\nSTATUS:\n    Reports whether a square is attacked by the selected color for local debugging.\n"
         .to_string()
 }
 
@@ -100,6 +111,21 @@ fn apply_move_from_fen(fen: &str, value: &str) -> Result<String, String> {
         "fen: {}\nboard:\n{}\n",
         result.to_fen(),
         result.to_pretty_string()
+    ))
+}
+
+fn attacks_from_fen(fen: &str, square: &str, color: &str) -> Result<String, String> {
+    let position = position_from_fen(fen)?;
+    let square =
+        Square::from_algebraic(square).ok_or_else(|| format!("invalid square: {square}"))?;
+    let color = color_from_cli(color)?;
+    let attacked = is_square_attacked(&position, square, color);
+
+    Ok(format!(
+        "square: {}\nby: {}\nattacked: {}\n",
+        square.to_algebraic(),
+        color_name(color),
+        attacked
     ))
 }
 
@@ -176,6 +202,21 @@ fn position_from_fen(fen: &str) -> Result<Position, String> {
     Position::from_fen(fen).map_err(|error| format!("invalid FEN: {error}"))
 }
 
+fn color_from_cli(value: &str) -> Result<Color, String> {
+    match value {
+        "white" => Ok(Color::White),
+        "black" => Ok(Color::Black),
+        _ => Err(format!("invalid color: {value}. Use `white` or `black`.")),
+    }
+}
+
+const fn color_name(color: Color) -> &'static str {
+    match color {
+        Color::White => "white",
+        Color::Black => "black",
+    }
+}
+
 const fn promotion_name(promotion: Option<PieceKind>) -> &'static str {
     match promotion {
         None => "none",
@@ -203,6 +244,7 @@ mod tests {
         let output = run(["help".to_string()]).expect("help output");
 
         assert!(output.contains("COMMANDS:"));
+        assert!(output.contains("attacks"));
         assert!(output.contains("perft"));
     }
 
@@ -238,6 +280,62 @@ mod tests {
 
         assert!(output.contains("8 . . . . . . . ."));
         assert!(output.contains("  a b c d e f g h"));
+    }
+
+    #[test]
+    fn attacks_help_reports_debug_status() {
+        let output = run(["attacks".to_string(), "--help".to_string()]).expect("attacks help");
+
+        assert!(output.contains("rookforge attacks"));
+        assert!(output.contains("--square <SQUARE>"));
+    }
+
+    #[test]
+    fn attacks_command_reports_attacked_square() {
+        let output = run([
+            "attacks".to_string(),
+            "--fen".to_string(),
+            "4r3/8/8/8/4K3/8/8/8 w - - 0 1".to_string(),
+            "--square".to_string(),
+            "e4".to_string(),
+            "--by".to_string(),
+            "black".to_string(),
+        ])
+        .expect("attacks output");
+
+        assert_eq!(output, "square: e4\nby: black\nattacked: true\n");
+    }
+
+    #[test]
+    fn attacks_command_reports_unattacked_square() {
+        let output = run([
+            "attacks".to_string(),
+            "--fen".to_string(),
+            "startpos".to_string(),
+            "--square".to_string(),
+            "e4".to_string(),
+            "--by".to_string(),
+            "white".to_string(),
+        ])
+        .expect("attacks output");
+
+        assert_eq!(output, "square: e4\nby: white\nattacked: false\n");
+    }
+
+    #[test]
+    fn attacks_command_rejects_invalid_color() {
+        let error = run([
+            "attacks".to_string(),
+            "--fen".to_string(),
+            "startpos".to_string(),
+            "--square".to_string(),
+            "e4".to_string(),
+            "--by".to_string(),
+            "green".to_string(),
+        ])
+        .expect_err("invalid color should fail");
+
+        assert!(error.contains("invalid color"));
     }
 
     #[test]

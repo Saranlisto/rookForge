@@ -81,6 +81,28 @@ fn apply_e2e4_succeeds() {
 }
 
 #[test]
+fn attacks_command_succeeds() {
+    let output = Command::new(env!("CARGO_BIN_EXE_rookforge"))
+        .args([
+            "attacks",
+            "--fen",
+            "4r3/8/8/8/4K3/8/8/8 w - - 0 1",
+            "--square",
+            "e4",
+            "--by",
+            "black",
+        ])
+        .output()
+        .expect("run rookforge attacks --fen ... --square e4 --by black");
+
+    assert!(output.status.success());
+    assert_eq!(
+        String::from_utf8(output.stdout).expect("utf8 stdout"),
+        "square: e4\nby: black\nattacked: true\n"
+    );
+}
+
+#[test]
 fn move_parse_normal_move_succeeds() {
     let output = Command::new(env!("CARGO_BIN_EXE_rookforge"))
         .args(["move", "--parse", "e2e4"])

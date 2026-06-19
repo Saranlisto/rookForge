@@ -4,7 +4,7 @@ This file is the public progress ledger for Rookforge. It summarizes what has be
 
 ## Current Snapshot
 
-Rookforge is in the early engine-core phase. The repository can parse positions, inspect boards, parse UCI-style moves, generate pseudo-legal moves for all piece types, and apply basic moves to create a new position. It does not yet validate king safety or play a legal chess game.
+Rookforge is in the early engine-core phase. The repository can parse positions, inspect boards, parse UCI-style moves, generate pseudo-legal moves for all piece types, apply basic moves to create a new position, and detect attacked squares. It does not yet validate king safety or play a legal chess game.
 
 ## Completed Work
 
@@ -19,6 +19,7 @@ Rookforge is in the early engine-core phase. The repository can parse positions,
 | 007 | Sliding movegen | Added pseudo-legal bishop, rook, and queen moves, shared ray traversal, tests, and `movegen bishops` / `movegen rooks` / `movegen queens`. |
 | 008 | Combined movegen | Added `generate_pseudo_legal_moves`, all-piece pseudo-legal CLI debug output through `movegen all`, and starting-position count coverage of 20 moves. |
 | 009 | Move application | Added `apply_move`, quiet move/capture/promotion handling, side-to-move and counter updates, castling-right updates, and `rookforge apply`. |
+| 010 | Attack detection | Added `is_square_attacked`, pawn/leaper/slider/queen/blocker coverage, side-to-move-independent tests, and `rookforge attacks`. |
 
 ## Public Commands Available
 
@@ -36,6 +37,9 @@ rookforge movegen rooks --fen "8/8/8/3R4/8/8/8/8 w - - 0 1"
 rookforge movegen queens --fen "8/8/8/3Q4/8/8/8/8 w - - 0 1"
 rookforge movegen all --fen startpos
 rookforge apply --fen startpos --move e2e4
+rookforge attacks --fen "4r3/8/8/8/4K3/8/8/8 w - - 0 1" --square e4 --by black
+rookforge attacks --fen startpos --square e4 --by black
+rookforge attacks --fen startpos --square e4 --by white
 ```
 
 ## Current Validation Workflow
@@ -64,4 +68,4 @@ This runs formatting checks, clippy with warnings treated as errors, tests, buil
 
 ## Next Recommended Execution
 
-Day 010 should add reversible move history and unapply scaffolding. That gives the engine a safer base for legal move filtering, perft, and later search.
+Day 011 should add check detection and legal move filtering on top of `is_square_attacked`. That lets pseudo-legal output become real legal move lists before perft validation begins.
