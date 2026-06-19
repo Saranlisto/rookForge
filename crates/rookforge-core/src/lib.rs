@@ -13,10 +13,11 @@ pub use board::{
     CastlingRights, Color, FenParseError, Piece, PieceKind, Position, Square, STARTING_POSITION_FEN,
 };
 pub use movegen::{
-    apply_move, generate_bishop_moves, generate_king_moves, generate_knight_moves,
-    generate_non_sliding_moves, generate_pawn_moves, generate_pseudo_legal_moves,
-    generate_queen_moves, generate_rook_moves, generate_sliding_piece_moves, is_square_attacked,
-    Move, MoveApplyError, MoveParseError,
+    apply_move, find_king, generate_bishop_moves, generate_king_moves, generate_knight_moves,
+    generate_legal_moves, generate_non_sliding_moves, generate_pawn_moves,
+    generate_pseudo_legal_moves, generate_queen_moves, generate_rook_moves,
+    generate_sliding_piece_moves, is_in_check, is_square_attacked, Move, MoveApplyError,
+    MoveParseError,
 };
 
 /// Human-readable engine name used by the CLI and future UCI identification.

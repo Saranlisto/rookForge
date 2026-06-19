@@ -1,6 +1,4 @@
-//! Move representation, parsing, and early pseudo-legal generation.
-//!
-//! Full legal move generation is intentionally not implemented yet.
+//! Move representation, parsing, pseudo-legal generation, and legal filtering.
 
 use std::fmt;
 use std::str::FromStr;
@@ -130,6 +128,45 @@ pub fn generate_pseudo_legal_moves(position: &Position) -> Vec<Move> {
     moves.extend(generate_queen_moves(position));
     moves.extend(generate_king_moves(position));
     moves
+}
+
+/// Finds the king square for `color`, if the position contains one.
+#[must_use]
+pub fn find_king(position: &Position, color: Color) -> Option<Square> {
+    position.occupied_by_color(color).into_iter().find(
+        |&square| matches!(position.piece_at(square), Some(piece) if piece.kind == PieceKind::King),
+    )
+}
+
+/// Returns true if `color`'s king is currently attacked by the opponent.
+///
+/// Positions without a king for `color` are treated as not in check so that
+/// structurally parsed test positions can still be inspected.
+#[must_use]
+pub fn is_in_check(position: &Position, color: Color) -> bool {
+    find_king(position, color)
+        .is_some_and(|king_square| is_square_attacked(position, king_square, color.opposite()))
+}
+
+/// Generates currently supported legal moves for the side to move.
+///
+/// This filters pseudo-legal moves by applying each move and rejecting any move
+/// that leaves the moving side's king in check. Castling and en passant are not
+/// generated yet.
+#[must_use]
+pub fn generate_legal_moves(position: &Position) -> Vec<Move> {
+    let moving_side = position.side_to_move();
+
+    generate_pseudo_legal_moves(position)
+        .into_iter()
+        .filter(|&mv| !targets_opponent_king(position, mv))
+        .filter_map(|mv| {
+            apply_move(position, mv)
+                .ok()
+                .filter(|candidate| !is_in_check(candidate, moving_side))
+                .map(|_| mv)
+        })
+        .collect()
 }
 
 /// Returns true when `square` is attacked by any piece of `by_color`.
@@ -391,6 +428,10 @@ fn add_leaper_moves_from(
 
 fn can_land_on(position: &Position, color: Color, target: Square) -> bool {
     !matches!(position.piece_at(target), Some(piece) if piece.color == color)
+}
+
+fn targets_opponent_king(position: &Position, mv: Move) -> bool {
+    matches!(position.piece_at(mv.to), Some(piece) if piece.kind == PieceKind::King)
 }
 
 fn generate_sliding_moves_for_kind(
@@ -768,6 +809,10 @@ mod tests {
         moves_from_fen(fen, generate_pseudo_legal_moves)
     }
 
+    fn legal_moves_from_fen(fen: &str) -> Vec<String> {
+        moves_from_fen(fen, generate_legal_moves)
+    }
+
     fn apply_move_from_uci(fen: &str, value: &str) -> Result<Position, MoveApplyError> {
         let position = Position::from_fen(fen).expect("valid test FEN");
         let mv = Move::from_uci(value).expect("valid test move");
@@ -780,6 +825,12 @@ mod tests {
         let target = square(target);
 
         is_square_attacked(&position, target, by_color)
+    }
+
+    fn in_check(fen: &str, color: Color) -> bool {
+        let position = Position::from_fen(fen).expect("valid test FEN");
+
+        is_in_check(&position, color)
     }
 
     fn sorted_moves(values: &[&str]) -> Vec<String> {
@@ -1970,5 +2021,110 @@ mod tests {
             "e8",
             Color::White
         ));
+    }
+
+    #[test]
+    fn find_king_returns_square_for_color() {
+        let position = Position::from_fen("4k3/8/8/8/8/8/8/4K3 w - - 0 1").expect("valid test FEN");
+
+        assert_eq!(find_king(&position, Color::White), Some(square("e1")));
+        assert_eq!(find_king(&position, Color::Black), Some(square("e8")));
+    }
+
+    #[test]
+    fn find_king_returns_none_when_missing() {
+        let position = Position::from_fen("8/8/8/8/8/8/8/4K3 w - - 0 1").expect("valid test FEN");
+
+        assert_eq!(find_king(&position, Color::Black), None);
+    }
+
+    #[test]
+    fn king_not_in_check_returns_false() {
+        assert!(!in_check("4k3/8/8/8/8/8/8/4K3 w - - 0 1", Color::White));
+    }
+
+    #[test]
+    fn missing_king_is_not_in_check() {
+        assert!(!in_check("8/8/8/8/8/8/8/8 w - - 0 1", Color::White));
+    }
+
+    #[test]
+    fn rook_check_is_detected() {
+        assert!(in_check("4r3/8/8/8/8/8/8/4K3 w - - 0 1", Color::White));
+    }
+
+    #[test]
+    fn bishop_check_is_detected() {
+        assert!(in_check("8/8/8/8/7b/8/8/4K3 w - - 0 1", Color::White));
+    }
+
+    #[test]
+    fn queen_check_is_detected() {
+        assert!(in_check("4q3/8/8/8/8/8/8/4K3 w - - 0 1", Color::White));
+    }
+
+    #[test]
+    fn knight_check_is_detected() {
+        assert!(in_check("8/8/8/8/8/5n2/8/4K3 w - - 0 1", Color::White));
+    }
+
+    #[test]
+    fn pawn_check_is_detected() {
+        assert!(in_check("8/8/8/8/8/8/3p4/4K3 w - - 0 1", Color::White));
+    }
+
+    #[test]
+    fn adjacent_king_check_is_detected() {
+        assert!(in_check("8/8/8/8/8/8/4k3/4K3 w - - 0 1", Color::White));
+    }
+
+    #[test]
+    fn legal_move_generation_filters_moves_that_expose_own_king() {
+        let moves = legal_moves_from_fen("4r3/8/8/8/8/8/4R3/4K3 w - - 0 1");
+
+        assert!(!moves.contains(&"e2d2".to_string()));
+        assert!(moves.contains(&"e2e8".to_string()));
+    }
+
+    #[test]
+    fn legal_move_generation_allows_moves_that_block_check() {
+        let moves = legal_moves_from_fen("4r3/8/8/8/8/8/8/2B1K3 w - - 0 1");
+
+        assert!(moves.contains(&"c1e3".to_string()));
+    }
+
+    #[test]
+    fn legal_move_generation_allows_king_moves_out_of_check() {
+        let moves = legal_moves_from_fen("4r3/8/8/8/8/8/8/4K3 w - - 0 1");
+
+        assert!(moves.contains(&"e1d1".to_string()));
+        assert!(!moves.contains(&"e1e2".to_string()));
+    }
+
+    #[test]
+    fn legal_move_generation_allows_captures_of_checking_piece() {
+        let moves = legal_moves_from_fen("8/8/8/8/8/8/4r3/4K3 w - - 0 1");
+
+        assert!(moves.contains(&"e1e2".to_string()));
+    }
+
+    #[test]
+    fn legal_move_generation_does_not_capture_opponent_king() {
+        let moves = legal_moves_from_fen("8/8/8/8/8/8/4k3/4K3 w - - 0 1");
+
+        assert!(!moves.contains(&"e1e2".to_string()));
+    }
+
+    #[test]
+    fn starting_position_has_twenty_legal_moves() {
+        assert_eq!(
+            legal_moves_from_fen(crate::board::STARTING_POSITION_FEN).len(),
+            20
+        );
+    }
+
+    #[test]
+    fn empty_board_has_no_legal_moves() {
+        assert_eq!(legal_moves_from_fen("8/8/8/8/8/8/8/8 w - - 0 1").len(), 0);
     }
 }

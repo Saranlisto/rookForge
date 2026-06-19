@@ -231,3 +231,19 @@ fn movegen_all_startpos_succeeds() {
     assert!(stdout.contains("h2h4"));
     assert!(stdout.contains("total: 20"));
 }
+
+#[test]
+fn movegen_legal_startpos_succeeds() {
+    let output = Command::new(env!("CARGO_BIN_EXE_rookforge"))
+        .args(["movegen", "legal", "--fen", "startpos"])
+        .output()
+        .expect("run rookforge movegen legal --fen startpos");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
+    assert!(stdout.contains("a2a3"));
+    assert!(stdout.contains("b1c3"));
+    assert!(stdout.contains("g1f3"));
+    assert!(stdout.contains("h2h4"));
+    assert!(stdout.contains("total: 20"));
+}

@@ -3,8 +3,8 @@ use std::process::ExitCode;
 
 use rookforge_core::{
     apply_move, generate_bishop_moves, generate_king_moves, generate_knight_moves,
-    generate_pawn_moves, generate_pseudo_legal_moves, generate_queen_moves, generate_rook_moves,
-    is_square_attacked, Color, Move, PieceKind, Position, Square, ENGINE_NAME,
+    generate_legal_moves, generate_pawn_moves, generate_pseudo_legal_moves, generate_queen_moves,
+    generate_rook_moves, is_square_attacked, Color, Move, PieceKind, Position, Square, ENGINE_NAME,
     STARTING_POSITION_FEN,
 };
 
@@ -52,6 +52,7 @@ fn run(args: impl IntoIterator<Item = String>) -> Result<String, String> {
         ["movegen", "rooks", "--fen", fen] => rook_moves_from_fen(fen),
         ["movegen", "queens", "--fen", fen] => queen_moves_from_fen(fen),
         ["movegen", "all", "--fen", fen] => pseudo_legal_moves_from_fen(fen),
+        ["movegen", "legal", "--fen", fen] => legal_moves_from_fen(fen),
         ["movegen", ..] => Err("invalid movegen command. Try `rookforge movegen --help`.".into()),
         ["perft", "help"] | ["perft", "--help"] | ["perft", "-h"] => Ok(perft_help_text()),
         ["perft", ..] => Err("perft is not implemented yet. Try `rookforge perft --help`.".into()),
@@ -88,7 +89,7 @@ fn move_help_text() -> String {
 }
 
 fn movegen_help_text() -> String {
-    "rookforge movegen\n\nUSAGE:\n    rookforge movegen pawns --fen <FEN|startpos>\n    rookforge movegen knights --fen <FEN|startpos>\n    rookforge movegen kings --fen <FEN|startpos>\n    rookforge movegen bishops --fen <FEN|startpos>\n    rookforge movegen rooks --fen <FEN|startpos>\n    rookforge movegen queens --fen <FEN|startpos>\n    rookforge movegen all --fen <FEN|startpos>\n\nSTATUS:\n    Generates selected pseudo-legal moves for local debugging.\n"
+    "rookforge movegen\n\nUSAGE:\n    rookforge movegen pawns --fen <FEN|startpos>\n    rookforge movegen knights --fen <FEN|startpos>\n    rookforge movegen kings --fen <FEN|startpos>\n    rookforge movegen bishops --fen <FEN|startpos>\n    rookforge movegen rooks --fen <FEN|startpos>\n    rookforge movegen queens --fen <FEN|startpos>\n    rookforge movegen all --fen <FEN|startpos>\n    rookforge movegen legal --fen <FEN|startpos>\n\nSTATUS:\n    Generates selected pseudo-legal or legal moves for local debugging.\n"
         .to_string()
 }
 
@@ -169,6 +170,10 @@ fn queen_moves_from_fen(fen: &str) -> Result<String, String> {
 
 fn pseudo_legal_moves_from_fen(fen: &str) -> Result<String, String> {
     movegen_moves_from_fen(fen, generate_pseudo_legal_moves)
+}
+
+fn legal_moves_from_fen(fen: &str) -> Result<String, String> {
+    movegen_moves_from_fen(fen, generate_legal_moves)
 }
 
 fn movegen_moves_from_fen(
@@ -479,6 +484,23 @@ mod tests {
         let output = run([
             "movegen".to_string(),
             "all".to_string(),
+            "--fen".to_string(),
+            "startpos".to_string(),
+        ])
+        .expect("movegen output");
+
+        assert!(output.contains("a2a3"));
+        assert!(output.contains("b1c3"));
+        assert!(output.contains("g1f3"));
+        assert!(output.contains("h2h4"));
+        assert!(output.contains("total: 20"));
+    }
+
+    #[test]
+    fn movegen_legal_command_prints_starting_position_moves() {
+        let output = run([
+            "movegen".to_string(),
+            "legal".to_string(),
             "--fen".to_string(),
             "startpos".to_string(),
         ])

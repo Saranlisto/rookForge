@@ -4,7 +4,7 @@ This file is the public progress ledger for Rookforge. It summarizes what has be
 
 ## Current Snapshot
 
-Rookforge is in the early engine-core phase. The repository can parse positions, inspect boards, parse UCI-style moves, generate pseudo-legal moves for all piece types, apply basic moves to create a new position, and detect attacked squares. It does not yet validate king safety or play a legal chess game.
+Rookforge is in the early engine-core phase. The repository can parse positions, inspect boards, parse UCI-style moves, generate pseudo-legal moves for all piece types, apply basic moves to create a new position, detect attacked squares, and filter legal moves. It does not yet implement all chess rules or play through UCI.
 
 ## Completed Work
 
@@ -20,6 +20,7 @@ Rookforge is in the early engine-core phase. The repository can parse positions,
 | 008 | Combined movegen | Added `generate_pseudo_legal_moves`, all-piece pseudo-legal CLI debug output through `movegen all`, and starting-position count coverage of 20 moves. |
 | 009 | Move application | Added `apply_move`, quiet move/capture/promotion handling, side-to-move and counter updates, castling-right updates, and `rookforge apply`. |
 | 010 | Attack detection | Added `is_square_attacked`, pawn/leaper/slider/queen/blocker coverage, side-to-move-independent tests, and `rookforge attacks`. |
+| 011 | Legal filtering | Added `find_king`, `is_in_check`, `generate_legal_moves`, check-detection tests, legal move filtering tests, and `rookforge movegen legal`. |
 
 ## Public Commands Available
 
@@ -36,6 +37,7 @@ rookforge movegen bishops --fen "8/8/8/3B4/8/8/8/8 w - - 0 1"
 rookforge movegen rooks --fen "8/8/8/3R4/8/8/8/8 w - - 0 1"
 rookforge movegen queens --fen "8/8/8/3Q4/8/8/8/8 w - - 0 1"
 rookforge movegen all --fen startpos
+rookforge movegen legal --fen startpos
 rookforge apply --fen startpos --move e2e4
 rookforge attacks --fen "4r3/8/8/8/4K3/8/8/8 w - - 0 1" --square e4 --by black
 rookforge attacks --fen startpos --square e4 --by black
@@ -52,8 +54,6 @@ This runs formatting checks, clippy with warnings treated as errors, tests, buil
 
 ## Intentionally Not Implemented Yet
 
-- Legal move filtering
-- Check detection
 - Castling execution
 - En passant capture
 - Unapply move transitions
@@ -68,4 +68,4 @@ This runs formatting checks, clippy with warnings treated as errors, tests, buil
 
 ## Next Recommended Execution
 
-Day 011 should add check detection and legal move filtering on top of `is_square_attacked`. That lets pseudo-legal output become real legal move lists before perft validation begins.
+Day 012 should add basic perft on top of legal move generation. That gives the project repeatable node-count validation before castling and en passant are introduced.
