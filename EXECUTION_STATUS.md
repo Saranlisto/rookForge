@@ -4,7 +4,7 @@ This file is the public progress ledger for Rookforge. It summarizes what has be
 
 ## Current Snapshot
 
-Rookforge is in the early engine-core phase. The repository can parse positions, inspect boards, parse UCI-style moves, and generate pseudo-legal moves for all piece types. It does not yet validate king safety or play a legal chess game.
+Rookforge is in the early engine-core phase. The repository can parse positions, inspect boards, parse UCI-style moves, generate pseudo-legal moves for all piece types, and apply basic moves to create a new position. It does not yet validate king safety or play a legal chess game.
 
 ## Completed Work
 
@@ -18,6 +18,7 @@ Rookforge is in the early engine-core phase. The repository can parse positions,
 | 006 | Leaper movegen | Added pseudo-legal knight and one-square king moves, shared leaper occupancy handling, tests, and `movegen knights` / `movegen kings`. |
 | 007 | Sliding movegen | Added pseudo-legal bishop, rook, and queen moves, shared ray traversal, tests, and `movegen bishops` / `movegen rooks` / `movegen queens`. |
 | 008 | Combined movegen | Added `generate_pseudo_legal_moves`, all-piece pseudo-legal CLI debug output through `movegen all`, and starting-position count coverage of 20 moves. |
+| 009 | Move application | Added `apply_move`, quiet move/capture/promotion handling, side-to-move and counter updates, castling-right updates, and `rookforge apply`. |
 
 ## Public Commands Available
 
@@ -34,6 +35,7 @@ rookforge movegen bishops --fen "8/8/8/3B4/8/8/8/8 w - - 0 1"
 rookforge movegen rooks --fen "8/8/8/3R4/8/8/8/8 w - - 0 1"
 rookforge movegen queens --fen "8/8/8/3Q4/8/8/8/8 w - - 0 1"
 rookforge movegen all --fen startpos
+rookforge apply --fen startpos --move e2e4
 ```
 
 ## Current Validation Workflow
@@ -48,9 +50,10 @@ This runs formatting checks, clippy with warnings treated as errors, tests, buil
 
 - Legal move filtering
 - Check detection
-- Castling move generation
-- En passant move generation
-- Make/unmake move transitions
+- Castling execution
+- En passant capture
+- Unapply move transitions
+- Reversible move history
 - Real perft execution
 - Search
 - Evaluation
@@ -61,4 +64,4 @@ This runs formatting checks, clippy with warnings treated as errors, tests, buil
 
 ## Next Recommended Execution
 
-Day 009 should add make/unmake move scaffolding and reversible board-state transitions. That gives the engine a safe base for legal move filtering, perft, and later search.
+Day 010 should add reversible move history and unapply scaffolding. That gives the engine a safer base for legal move filtering, perft, and later search.

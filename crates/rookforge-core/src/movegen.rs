@@ -5,7 +5,7 @@
 use std::fmt;
 use std::str::FromStr;
 
-use crate::board::{Color, PieceKind, Position, Square};
+use crate::board::{CastlingRights, Color, Piece, PieceKind, Position, Square};
 
 const PROMOTION_PIECES: [PieceKind; 4] = [
     PieceKind::Queen,
@@ -130,6 +130,136 @@ pub fn generate_pseudo_legal_moves(position: &Position) -> Vec<Move> {
     moves.extend(generate_queen_moves(position));
     moves.extend(generate_king_moves(position));
     moves
+}
+
+/// Applies a structurally valid move to a position and returns the resulting position.
+///
+/// This does not check whether the move is pseudo-legal or legal. It only moves
+/// pieces, handles captures/promotions, updates turn metadata, and clears or
+/// sets simple state that is affected by the move.
+pub fn apply_move(position: &Position, mv: Move) -> Result<Position, MoveApplyError> {
+    let moving_piece = position
+        .piece_at(mv.from)
+        .ok_or(MoveApplyError::EmptySourceSquare { source: mv.from })?;
+    let captured_piece = position.piece_at(mv.to);
+    let placed_piece = piece_after_promotion(moving_piece, mv.promotion)?;
+    let moving_side = position.side_to_move();
+
+    let mut next = position.clone();
+    let mut castling_rights = next.castling_rights();
+
+    update_castling_rights_for_move(&mut castling_rights, moving_piece, mv.from);
+    if let Some(piece) = captured_piece {
+        update_castling_rights_for_capture(&mut castling_rights, piece, mv.to);
+    }
+
+    next.clear_square(mv.from);
+    next.set_piece(mv.to, placed_piece);
+    next.set_castling_rights(castling_rights);
+    next.set_en_passant_target(en_passant_target_after_move(moving_piece, mv));
+
+    if moving_piece.kind == PieceKind::Pawn || captured_piece.is_some() {
+        next.set_halfmove_clock(0);
+    } else {
+        next.set_halfmove_clock(position.halfmove_clock().saturating_add(1));
+    }
+
+    if moving_side == Color::Black {
+        next.set_fullmove_number(position.fullmove_number().saturating_add(1));
+    }
+
+    next.set_side_to_move(moving_side.opposite());
+
+    Ok(next)
+}
+
+fn piece_after_promotion(
+    moving_piece: Piece,
+    promotion: Option<PieceKind>,
+) -> Result<Piece, MoveApplyError> {
+    let Some(promotion) = promotion else {
+        return Ok(moving_piece);
+    };
+
+    if !is_valid_promotion_piece(promotion) {
+        return Err(MoveApplyError::InvalidPromotionPiece(promotion));
+    }
+
+    if moving_piece.kind != PieceKind::Pawn {
+        return Err(MoveApplyError::PromotionWithoutPawn {
+            source_kind: moving_piece.kind,
+        });
+    }
+
+    Ok(Piece::new(moving_piece.color, promotion))
+}
+
+fn en_passant_target_after_move(moving_piece: Piece, mv: Move) -> Option<Square> {
+    if moving_piece.kind != PieceKind::Pawn || mv.from.file() != mv.to.file() {
+        return None;
+    }
+
+    let from_rank = mv.from.rank();
+    let to_rank = mv.to.rank();
+
+    if from_rank.abs_diff(to_rank) == 2 {
+        let passed_rank = (from_rank + to_rank) / 2;
+        Square::new(mv.from.file(), passed_rank)
+    } else {
+        None
+    }
+}
+
+fn update_castling_rights_for_move(rights: &mut CastlingRights, moving_piece: Piece, from: Square) {
+    match (moving_piece.color, moving_piece.kind) {
+        (Color::White, PieceKind::King) => {
+            rights.white_kingside = false;
+            rights.white_queenside = false;
+        }
+        (Color::Black, PieceKind::King) => {
+            rights.black_kingside = false;
+            rights.black_queenside = false;
+        }
+        (Color::White, PieceKind::Rook) if from == square("h1") => {
+            rights.white_kingside = false;
+        }
+        (Color::White, PieceKind::Rook) if from == square("a1") => {
+            rights.white_queenside = false;
+        }
+        (Color::Black, PieceKind::Rook) if from == square("h8") => {
+            rights.black_kingside = false;
+        }
+        (Color::Black, PieceKind::Rook) if from == square("a8") => {
+            rights.black_queenside = false;
+        }
+        _ => {}
+    }
+}
+
+fn update_castling_rights_for_capture(
+    rights: &mut CastlingRights,
+    captured_piece: Piece,
+    target: Square,
+) {
+    match (captured_piece.color, captured_piece.kind) {
+        (Color::White, PieceKind::Rook) if target == square("h1") => {
+            rights.white_kingside = false;
+        }
+        (Color::White, PieceKind::Rook) if target == square("a1") => {
+            rights.white_queenside = false;
+        }
+        (Color::Black, PieceKind::Rook) if target == square("h8") => {
+            rights.black_kingside = false;
+        }
+        (Color::Black, PieceKind::Rook) if target == square("a8") => {
+            rights.black_queenside = false;
+        }
+        _ => {}
+    }
+}
+
+fn square(value: &str) -> Square {
+    Square::from_algebraic(value).expect("hard-coded square is valid")
 }
 
 fn generate_leaper_moves(position: &Position, kind: PieceKind, deltas: &[(i8, i8)]) -> Vec<Move> {
@@ -463,6 +593,39 @@ impl fmt::Display for MoveParseError {
 
 impl std::error::Error for MoveParseError {}
 
+/// Errors produced when applying a structurally invalid move to a position.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MoveApplyError {
+    EmptySourceSquare { source: Square },
+    InvalidPromotionPiece(PieceKind),
+    PromotionWithoutPawn { source_kind: PieceKind },
+}
+
+impl fmt::Display for MoveApplyError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::EmptySourceSquare { source } => {
+                write!(
+                    formatter,
+                    "source square `{}` is empty",
+                    source.to_algebraic()
+                )
+            }
+            Self::InvalidPromotionPiece(kind) => {
+                write!(formatter, "invalid promotion piece `{kind:?}`")
+            }
+            Self::PromotionWithoutPawn { source_kind } => {
+                write!(
+                    formatter,
+                    "promotion requested for non-pawn source piece `{source_kind:?}`"
+                )
+            }
+        }
+    }
+}
+
+impl std::error::Error for MoveApplyError {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -507,6 +670,13 @@ mod tests {
 
     fn pseudo_legal_moves_from_fen(fen: &str) -> Vec<String> {
         moves_from_fen(fen, generate_pseudo_legal_moves)
+    }
+
+    fn apply_move_from_uci(fen: &str, value: &str) -> Result<Position, MoveApplyError> {
+        let position = Position::from_fen(fen).expect("valid test FEN");
+        let mv = Move::from_uci(value).expect("valid test move");
+
+        apply_move(&position, mv)
     }
 
     fn sorted_moves(values: &[&str]) -> Vec<String> {
@@ -1242,5 +1412,287 @@ mod tests {
         assert!(moves.contains(&"d5d8".to_string()));
         assert!(moves.contains(&"e1d1".to_string()));
         assert_eq!(moves, expected);
+    }
+
+    #[test]
+    fn applying_e2e4_from_starting_position_moves_pawn() {
+        let result =
+            apply_move_from_uci(crate::board::STARTING_POSITION_FEN, "e2e4").expect("move applies");
+
+        assert_eq!(result.piece_at(square("e2")), None);
+        assert_eq!(
+            result.piece_at(square("e4")),
+            Some(Piece::new(Color::White, PieceKind::Pawn))
+        );
+        assert_eq!(
+            result.to_fen(),
+            "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1"
+        );
+    }
+
+    #[test]
+    fn applying_e2e4_flips_side_to_move_to_black() {
+        let result =
+            apply_move_from_uci(crate::board::STARTING_POSITION_FEN, "e2e4").expect("move applies");
+
+        assert_eq!(result.side_to_move(), Color::Black);
+    }
+
+    #[test]
+    fn white_move_does_not_increment_fullmove_number() {
+        let result =
+            apply_move_from_uci(crate::board::STARTING_POSITION_FEN, "e2e4").expect("move applies");
+
+        assert_eq!(result.fullmove_number(), 1);
+    }
+
+    #[test]
+    fn black_move_increments_fullmove_number() {
+        let result = apply_move_from_uci(
+            "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1",
+            "e7e5",
+        )
+        .expect("move applies");
+
+        assert_eq!(result.side_to_move(), Color::White);
+        assert_eq!(result.fullmove_number(), 2);
+        assert_eq!(result.en_passant_target(), Some(square("e6")));
+    }
+
+    #[test]
+    fn quiet_non_pawn_move_increments_halfmove_clock() {
+        let result =
+            apply_move_from_uci("8/8/8/8/8/8/8/N7 w - - 7 3", "a1b3").expect("move applies");
+
+        assert_eq!(result.halfmove_clock(), 8);
+    }
+
+    #[test]
+    fn pawn_move_resets_halfmove_clock() {
+        let result =
+            apply_move_from_uci("8/8/8/8/8/8/4P3/8 w - - 12 4", "e2e4").expect("move applies");
+
+        assert_eq!(result.halfmove_clock(), 0);
+    }
+
+    #[test]
+    fn capture_resets_halfmove_clock() {
+        let result =
+            apply_move_from_uci("8/5p2/8/8/2B5/8/8/8 w - - 9 4", "c4f7").expect("move applies");
+
+        assert_eq!(result.halfmove_clock(), 0);
+    }
+
+    #[test]
+    fn capture_removes_opponent_piece() {
+        let result =
+            apply_move_from_uci("8/5p2/8/8/2B5/8/8/8 w - - 9 4", "c4f7").expect("move applies");
+
+        assert_eq!(result.piece_at(square("c4")), None);
+        assert_eq!(
+            result.piece_at(square("f7")),
+            Some(Piece::new(Color::White, PieceKind::Bishop))
+        );
+        assert_eq!(result.count_pieces(), 1);
+    }
+
+    #[test]
+    fn promotion_to_queen_works() {
+        let result =
+            apply_move_from_uci("8/4P3/8/8/8/8/8/8 w - - 0 1", "e7e8q").expect("move applies");
+
+        assert_eq!(
+            result.piece_at(square("e8")),
+            Some(Piece::new(Color::White, PieceKind::Queen))
+        );
+        assert_eq!(result.to_fen(), "4Q3/8/8/8/8/8/8/8 b - - 0 1");
+    }
+
+    #[test]
+    fn promotion_to_rook_works() {
+        let result =
+            apply_move_from_uci("8/4P3/8/8/8/8/8/8 w - - 0 1", "e7e8r").expect("move applies");
+
+        assert_eq!(
+            result.piece_at(square("e8")),
+            Some(Piece::new(Color::White, PieceKind::Rook))
+        );
+    }
+
+    #[test]
+    fn promotion_to_bishop_works() {
+        let result =
+            apply_move_from_uci("8/4P3/8/8/8/8/8/8 w - - 0 1", "e7e8b").expect("move applies");
+
+        assert_eq!(
+            result.piece_at(square("e8")),
+            Some(Piece::new(Color::White, PieceKind::Bishop))
+        );
+    }
+
+    #[test]
+    fn promotion_to_knight_works() {
+        let result =
+            apply_move_from_uci("8/4P3/8/8/8/8/8/8 w - - 0 1", "e7e8n").expect("move applies");
+
+        assert_eq!(
+            result.piece_at(square("e8")),
+            Some(Piece::new(Color::White, PieceKind::Knight))
+        );
+    }
+
+    #[test]
+    fn promotion_with_non_pawn_source_returns_error() {
+        assert_eq!(
+            apply_move_from_uci("8/4N3/8/8/8/8/8/8 w - - 0 1", "e7e8q"),
+            Err(MoveApplyError::PromotionWithoutPawn {
+                source_kind: PieceKind::Knight,
+            })
+        );
+    }
+
+    #[test]
+    fn invalid_promotion_piece_returns_error() {
+        let position = Position::from_fen("8/4P3/8/8/8/8/8/8 w - - 0 1").expect("valid FEN");
+        let mv = Move {
+            from: square("e7"),
+            to: square("e8"),
+            promotion: Some(PieceKind::Pawn),
+        };
+
+        assert_eq!(
+            apply_move(&position, mv),
+            Err(MoveApplyError::InvalidPromotionPiece(PieceKind::Pawn))
+        );
+    }
+
+    #[test]
+    fn empty_source_square_returns_error() {
+        assert_eq!(
+            apply_move_from_uci(crate::board::STARTING_POSITION_FEN, "e3e4"),
+            Err(MoveApplyError::EmptySourceSquare {
+                source: square("e3"),
+            })
+        );
+    }
+
+    #[test]
+    fn white_king_move_removes_both_white_castling_rights() {
+        let result = apply_move_from_uci("r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1", "e1e2")
+            .expect("move applies");
+
+        assert_eq!(
+            result.castling_rights(),
+            CastlingRights {
+                white_kingside: false,
+                white_queenside: false,
+                black_kingside: true,
+                black_queenside: true,
+            }
+        );
+    }
+
+    #[test]
+    fn black_king_move_removes_both_black_castling_rights() {
+        let result = apply_move_from_uci("r3k2r/8/8/8/8/8/8/R3K2R b KQkq - 0 1", "e8e7")
+            .expect("move applies");
+
+        assert_eq!(
+            result.castling_rights(),
+            CastlingRights {
+                white_kingside: true,
+                white_queenside: true,
+                black_kingside: false,
+                black_queenside: false,
+            }
+        );
+    }
+
+    #[test]
+    fn white_rook_move_from_h1_removes_white_kingside_castling_right() {
+        let result = apply_move_from_uci("r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1", "h1h3")
+            .expect("move applies");
+
+        assert!(!result.castling_rights().white_kingside);
+        assert!(result.castling_rights().white_queenside);
+    }
+
+    #[test]
+    fn white_rook_move_from_a1_removes_white_queenside_castling_right() {
+        let result = apply_move_from_uci("r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1", "a1a3")
+            .expect("move applies");
+
+        assert!(result.castling_rights().white_kingside);
+        assert!(!result.castling_rights().white_queenside);
+    }
+
+    #[test]
+    fn black_rook_move_from_h8_removes_black_kingside_castling_right() {
+        let result = apply_move_from_uci("r3k2r/8/8/8/8/8/8/R3K2R b KQkq - 0 1", "h8h6")
+            .expect("move applies");
+
+        assert!(!result.castling_rights().black_kingside);
+        assert!(result.castling_rights().black_queenside);
+    }
+
+    #[test]
+    fn black_rook_move_from_a8_removes_black_queenside_castling_right() {
+        let result = apply_move_from_uci("r3k2r/8/8/8/8/8/8/R3K2R b KQkq - 0 1", "a8a6")
+            .expect("move applies");
+
+        assert!(result.castling_rights().black_kingside);
+        assert!(!result.castling_rights().black_queenside);
+    }
+
+    #[test]
+    fn capturing_rook_on_original_square_removes_related_castling_right() {
+        let cases = [
+            (
+                "r3k2r/8/8/8/8/8/7q/R3K2R b KQkq - 0 1",
+                "h2h1",
+                CastlingRights {
+                    white_kingside: false,
+                    white_queenside: true,
+                    black_kingside: true,
+                    black_queenside: true,
+                },
+            ),
+            (
+                "r3k2r/8/8/8/8/8/q7/R3K2R b KQkq - 0 1",
+                "a2a1",
+                CastlingRights {
+                    white_kingside: true,
+                    white_queenside: false,
+                    black_kingside: true,
+                    black_queenside: true,
+                },
+            ),
+            (
+                "r3k2r/7Q/8/8/8/8/8/R3K2R w KQkq - 0 1",
+                "h7h8",
+                CastlingRights {
+                    white_kingside: true,
+                    white_queenside: true,
+                    black_kingside: false,
+                    black_queenside: true,
+                },
+            ),
+            (
+                "r3k2r/Q7/8/8/8/8/8/R3K2R w KQkq - 0 1",
+                "a7a8",
+                CastlingRights {
+                    white_kingside: true,
+                    white_queenside: true,
+                    black_kingside: true,
+                    black_queenside: false,
+                },
+            ),
+        ];
+
+        for (fen, mv, expected_rights) in cases {
+            let result = apply_move_from_uci(fen, mv).expect("move applies");
+
+            assert_eq!(result.castling_rights(), expected_rights);
+        }
     }
 }

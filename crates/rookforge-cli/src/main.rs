@@ -2,9 +2,9 @@ use std::env;
 use std::process::ExitCode;
 
 use rookforge_core::{
-    generate_bishop_moves, generate_king_moves, generate_knight_moves, generate_pawn_moves,
-    generate_pseudo_legal_moves, generate_queen_moves, generate_rook_moves, Move, PieceKind,
-    Position, ENGINE_NAME, STARTING_POSITION_FEN,
+    apply_move, generate_bishop_moves, generate_king_moves, generate_knight_moves,
+    generate_pawn_moves, generate_pseudo_legal_moves, generate_queen_moves, generate_rook_moves,
+    Move, PieceKind, Position, ENGINE_NAME, STARTING_POSITION_FEN,
 };
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -29,6 +29,9 @@ fn run(args: impl IntoIterator<Item = String>) -> Result<String, String> {
     match parts.as_slice() {
         [] | ["help"] | ["--help"] | ["-h"] => Ok(help_text()),
         ["--version"] | ["-V"] => Ok(format!("rookforge {VERSION}\n")),
+        ["apply", "help"] | ["apply", "--help"] | ["apply", "-h"] => Ok(apply_help_text()),
+        ["apply", "--fen", fen, "--move", value] => apply_move_from_fen(fen, value),
+        ["apply", ..] => Err("invalid apply command. Try `rookforge apply --help`.".into()),
         ["board", "help"] | ["board", "--help"] | ["board", "-h"] => Ok(board_help_text()),
         ["board", "--fen", fen] => board_from_fen(fen),
         ["board", ..] => Err("invalid board command. Try `rookforge board --help`.".into()),
@@ -54,8 +57,13 @@ fn run(args: impl IntoIterator<Item = String>) -> Result<String, String> {
 
 fn help_text() -> String {
     format!(
-        "{ENGINE_NAME} chess engine scaffold\n\nUSAGE:\n    rookforge <COMMAND>\n\nCOMMANDS:\n    board       Print a FEN position as a board\n    help        Show this help text\n    move        Parse a UCI-style move\n    movegen     Generate selected pseudo-legal moves\n    perft       Inspect perft command options\n\nOPTIONS:\n    -h, --help      Show this help text\n    -V, --version   Show version information\n"
+        "{ENGINE_NAME} chess engine scaffold\n\nUSAGE:\n    rookforge <COMMAND>\n\nCOMMANDS:\n    apply       Apply a move to a FEN position\n    board       Print a FEN position as a board\n    help        Show this help text\n    move        Parse a UCI-style move\n    movegen     Generate selected pseudo-legal moves\n    perft       Inspect perft command options\n\nOPTIONS:\n    -h, --help      Show this help text\n    -V, --version   Show version information\n"
     )
+}
+
+fn apply_help_text() -> String {
+    "rookforge apply\n\nUSAGE:\n    rookforge apply --fen <FEN|startpos> --move <MOVE>\n\nSTATUS:\n    Applies a structurally parsed move to a FEN position for local debugging.\n"
+        .to_string()
 }
 
 fn board_help_text() -> String {
@@ -80,6 +88,19 @@ fn perft_help_text() -> String {
 
 fn board_from_fen(fen: &str) -> Result<String, String> {
     position_from_fen(fen).map(|position| format!("{}\n", position.to_pretty_string()))
+}
+
+fn apply_move_from_fen(fen: &str, value: &str) -> Result<String, String> {
+    let position = position_from_fen(fen)?;
+    let mv = Move::from_uci(value).map_err(|error| format!("invalid move: {error}"))?;
+    let result =
+        apply_move(&position, mv).map_err(|error| format!("cannot apply move: {error}"))?;
+
+    Ok(format!(
+        "fen: {}\nboard:\n{}\n",
+        result.to_fen(),
+        result.to_pretty_string()
+    ))
 }
 
 fn move_from_uci(value: &str) -> Result<String, String> {
@@ -216,6 +237,22 @@ mod tests {
         .expect("board output");
 
         assert!(output.contains("8 . . . . . . . ."));
+        assert!(output.contains("  a b c d e f g h"));
+    }
+
+    #[test]
+    fn apply_command_prints_resulting_fen_and_board() {
+        let output = run([
+            "apply".to_string(),
+            "--fen".to_string(),
+            "startpos".to_string(),
+            "--move".to_string(),
+            "e2e4".to_string(),
+        ])
+        .expect("apply output");
+
+        assert!(output.contains("fen: rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1"));
+        assert!(output.contains("4 . . . . P . . ."));
         assert!(output.contains("  a b c d e f g h"));
     }
 

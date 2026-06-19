@@ -27,6 +27,7 @@ smoke:
 	cargo run -- movegen rooks --fen "8/8/8/3R4/8/8/8/8 w - - 0 1"
 	cargo run -- movegen queens --fen "8/8/8/3Q4/8/8/8/8 w - - 0 1"
 	cargo run -- movegen all --fen startpos
+	cargo run -- apply --fen startpos --move e2e4
 
 check:
 	./scripts/local-check.sh

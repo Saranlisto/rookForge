@@ -376,6 +376,26 @@ impl Position {
         self.fullmove_number
     }
 
+    pub(crate) const fn set_side_to_move(&mut self, side_to_move: Color) {
+        self.side_to_move = side_to_move;
+    }
+
+    pub(crate) const fn set_castling_rights(&mut self, castling_rights: CastlingRights) {
+        self.castling_rights = castling_rights;
+    }
+
+    pub(crate) const fn set_en_passant_target(&mut self, en_passant_target: Option<Square>) {
+        self.en_passant_target = en_passant_target;
+    }
+
+    pub(crate) const fn set_halfmove_clock(&mut self, halfmove_clock: u32) {
+        self.halfmove_clock = halfmove_clock;
+    }
+
+    pub(crate) const fn set_fullmove_number(&mut self, fullmove_number: u32) {
+        self.fullmove_number = fullmove_number;
+    }
+
     /// Renders the board as ranks 8 through 1 with file labels.
     #[must_use]
     pub fn to_pretty_string(&self) -> String {

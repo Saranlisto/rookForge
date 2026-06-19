@@ -34,7 +34,7 @@ Initial core modules:
 
 ## Current Status
 
-Rookforge is currently a production-grade scaffold with structural FEN parsing, board inspection helpers, UCI-style move parsing, combined pseudo-legal move generation, and local debug commands. It does not play chess yet.
+Rookforge is currently a production-grade scaffold with structural FEN parsing, board inspection helpers, UCI-style move parsing, combined pseudo-legal move generation, basic move application, and local debug commands. It does not play chess yet.
 
 Execution completed to date:
 
@@ -48,6 +48,7 @@ Execution completed to date:
 | 006 | Pseudo-legal knight and king move generation and related CLI commands. |
 | 007 | Pseudo-legal bishop, rook, and queen sliding move generation and related CLI commands. |
 | 008 | Combined all-piece pseudo-legal move generation and `movegen all`. |
+| 009 | Basic move application for quiet moves, captures, promotions, counters, castling-right updates, and `apply`. |
 
 Implemented:
 
@@ -64,6 +65,7 @@ Implemented:
 - Pseudo-legal knight and one-square king move generation
 - Pseudo-legal bishop, rook, and queen sliding move generation
 - Combined all-piece pseudo-legal move generation for pawns, knights, bishops, rooks, queens, and kings
+- Basic move application for quiet moves, captures, promotions, side-to-move updates, move counters, and castling-right updates
 - Human-readable board display for debugging
 - Unit tests for the placeholder types
 - CLI tests for basic command behavior
@@ -74,8 +76,9 @@ Implemented:
 Intentionally not implemented yet:
 
 - Legal move generation
-- Castling
-- En passant
+- Castling execution
+- En passant capture
+- Unapply/reversible move history
 - Perft execution
 - Search
 - Evaluation
@@ -83,10 +86,10 @@ Intentionally not implemented yet:
 
 ## Roadmap
 
-1. Add make/unmake move structure.
+1. Add reversible move history and unapply scaffolding.
 2. Add legal move filtering and check detection.
 3. Add perft with known test positions.
-4. Add castling and en passant move generation.
+4. Add castling execution and en passant capture.
 5. Add UCI command loop.
 6. Add search and evaluation.
 7. Add benchmarks and strength testing.
@@ -116,6 +119,7 @@ cargo run -- movegen bishops --fen "8/8/8/3B4/8/8/8/8 w - - 0 1"
 cargo run -- movegen rooks --fen "8/8/8/3R4/8/8/8/8 w - - 0 1"
 cargo run -- movegen queens --fen "8/8/8/3Q4/8/8/8/8 w - - 0 1"
 cargo run -- movegen all --fen startpos
+cargo run -- apply --fen startpos --move e2e4
 ```
 
 ## Build And Test
@@ -142,4 +146,5 @@ rookforge movegen bishops --fen "8/8/8/3B4/8/8/8/8 w - - 0 1"
 rookforge movegen rooks --fen "8/8/8/3R4/8/8/8/8 w - - 0 1"
 rookforge movegen queens --fen "8/8/8/3Q4/8/8/8/8 w - - 0 1"
 rookforge movegen all --fen startpos
+rookforge apply --fen startpos --move e2e4
 ```

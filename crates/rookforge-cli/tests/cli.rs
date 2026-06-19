@@ -67,6 +67,20 @@ fn board_empty_fen_succeeds() {
 }
 
 #[test]
+fn apply_e2e4_succeeds() {
+    let output = Command::new(env!("CARGO_BIN_EXE_rookforge"))
+        .args(["apply", "--fen", "startpos", "--move", "e2e4"])
+        .output()
+        .expect("run rookforge apply --fen startpos --move e2e4");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
+    assert!(stdout.contains("fen: rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1"));
+    assert!(stdout.contains("4 . . . . P . . ."));
+    assert!(stdout.contains("  a b c d e f g h"));
+}
+
+#[test]
 fn move_parse_normal_move_succeeds() {
     let output = Command::new(env!("CARGO_BIN_EXE_rookforge"))
         .args(["move", "--parse", "e2e4"])
