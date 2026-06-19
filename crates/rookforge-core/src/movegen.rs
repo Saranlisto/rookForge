@@ -169,6 +169,30 @@ pub fn generate_legal_moves(position: &Position) -> Vec<Move> {
         .collect()
 }
 
+/// Counts legal move-tree leaf nodes to `depth`.
+///
+/// Depth 0 counts the current node as one. Deeper depths recursively apply
+/// legal moves and sum each child node count. Castling and en passant are not
+/// available until those rules are implemented in legal move generation.
+#[must_use]
+pub fn perft(position: &Position, depth: u32) -> u64 {
+    if depth == 0 {
+        return 1;
+    }
+
+    let moves = generate_legal_moves(position);
+
+    if depth == 1 {
+        return moves.len() as u64;
+    }
+
+    moves
+        .into_iter()
+        .filter_map(|mv| apply_move(position, mv).ok())
+        .map(|candidate| perft(&candidate, depth - 1))
+        .sum()
+}
+
 /// Returns true when `square` is attacked by any piece of `by_color`.
 ///
 /// This ignores side to move, does not mutate the position, and does not check
@@ -811,6 +835,12 @@ mod tests {
 
     fn legal_moves_from_fen(fen: &str) -> Vec<String> {
         moves_from_fen(fen, generate_legal_moves)
+    }
+
+    fn perft_from_fen(fen: &str, depth: u32) -> u64 {
+        let position = Position::from_fen(fen).expect("valid test FEN");
+
+        perft(&position, depth)
     }
 
     fn apply_move_from_uci(fen: &str, value: &str) -> Result<Position, MoveApplyError> {
@@ -2126,5 +2156,35 @@ mod tests {
     #[test]
     fn empty_board_has_no_legal_moves() {
         assert_eq!(legal_moves_from_fen("8/8/8/8/8/8/8/8 w - - 0 1").len(), 0);
+    }
+
+    #[test]
+    fn perft_depth_zero_counts_current_node() {
+        assert_eq!(perft_from_fen(crate::board::STARTING_POSITION_FEN, 0), 1);
+    }
+
+    #[test]
+    fn perft_depth_one_from_starting_position_is_twenty() {
+        assert_eq!(perft_from_fen(crate::board::STARTING_POSITION_FEN, 1), 20);
+    }
+
+    #[test]
+    fn perft_depth_two_from_starting_position_is_four_hundred() {
+        assert_eq!(perft_from_fen(crate::board::STARTING_POSITION_FEN, 2), 400);
+    }
+
+    #[test]
+    fn perft_empty_board_depth_one_is_zero() {
+        assert_eq!(perft_from_fen("8/8/8/8/8/8/8/8 w - - 0 1", 1), 0);
+    }
+
+    #[test]
+    fn perft_king_only_position_counts_legal_king_moves() {
+        assert_eq!(perft_from_fen("4k3/8/8/8/4K3/8/8/8 w - - 0 1", 1), 8);
+    }
+
+    #[test]
+    fn perft_pinned_piece_position_excludes_illegal_exposures() {
+        assert_eq!(perft_from_fen("k3r3/8/8/8/8/8/4R3/4K3 w - - 0 1", 1), 10);
     }
 }

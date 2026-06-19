@@ -34,7 +34,7 @@ Initial core modules:
 
 ## Current Status
 
-Rookforge is currently a production-grade scaffold with structural FEN parsing, board inspection helpers, UCI-style move parsing, combined pseudo-legal move generation, basic move application, attack detection, legal move filtering, and local debug commands. It does not play chess yet.
+Rookforge is currently a production-grade scaffold with structural FEN parsing, board inspection helpers, UCI-style move parsing, combined pseudo-legal move generation, basic move application, attack detection, legal move filtering, basic perft, and local debug commands. It does not play chess yet.
 
 Execution completed to date:
 
@@ -51,6 +51,7 @@ Execution completed to date:
 | 009 | Basic move application for quiet moves, captures, promotions, counters, castling-right updates, and `apply`. |
 | 010 | Attack detection for pawns, knights, kings, sliders, queens, blockers, and CLI attack inspection. |
 | 011 | King lookup, check detection, legal move filtering, and `movegen legal`. |
+| 012 | Recursive legal-move perft, start-position node tests, and `perft --fen ... --depth ...`. |
 
 Implemented:
 
@@ -71,6 +72,7 @@ Implemented:
 - Attack detection for pawns, knights, kings, bishops, rooks, queens, and blockers
 - King lookup and check detection
 - Legal move filtering by applying pseudo-legal moves and rejecting king-unsafe results
+- Basic recursive perft using legal moves
 - Human-readable board display for debugging
 - Unit tests for the placeholder types
 - CLI tests for basic command behavior
@@ -83,16 +85,16 @@ Intentionally not implemented yet:
 - Castling execution
 - En passant capture
 - Unapply/reversible move history
-- Perft execution
+- Perft divide mode
 - Search
 - Evaluation
 - UCI protocol handling
 
 ## Roadmap
 
-1. Add perft with known test positions.
-2. Add castling execution.
-3. Add en passant generation and application.
+1. Add castling generation and application.
+2. Add en passant generation and application.
+3. Add a hardened perft validation suite and divide mode.
 4. Add reversible move history and unapply scaffolding.
 5. Add UCI command loop.
 6. Add search and evaluation.
@@ -114,6 +116,8 @@ Useful local smoke commands:
 ```bash
 cargo run -- board --fen startpos
 cargo run -- board --fen "8/8/8/8/8/8/8/8 w - - 0 1"
+cargo run -- perft --fen startpos --depth 1
+cargo run -- perft --fen startpos --depth 2
 cargo run -- move --parse e2e4
 cargo run -- move --parse e7e8q
 cargo run -- movegen pawns --fen startpos
@@ -145,6 +149,8 @@ CLI examples:
 rookforge --version
 rookforge help
 rookforge perft --help
+rookforge perft --fen startpos --depth 1
+rookforge perft --fen startpos --depth 2
 rookforge board --fen startpos
 rookforge move --parse e2e4
 rookforge movegen pawns --fen startpos

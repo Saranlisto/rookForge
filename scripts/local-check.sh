@@ -8,6 +8,8 @@ cargo build
 cargo run -- --version
 cargo run -- help
 cargo run -- perft --help
+cargo run -- perft --fen startpos --depth 1
+cargo run -- perft --fen startpos --depth 2
 cargo run -- board --fen startpos
 cargo run -- board --fen "8/8/8/8/8/8/8/8 w - - 0 1"
 cargo run -- move --parse e2e4

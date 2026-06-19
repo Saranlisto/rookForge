@@ -4,7 +4,7 @@ This file is the public progress ledger for Rookforge. It summarizes what has be
 
 ## Current Snapshot
 
-Rookforge is in the early engine-core phase. The repository can parse positions, inspect boards, parse UCI-style moves, generate pseudo-legal moves for all piece types, apply basic moves to create a new position, detect attacked squares, and filter legal moves. It does not yet implement all chess rules or play through UCI.
+Rookforge is in the early engine-core phase. The repository can parse positions, inspect boards, parse UCI-style moves, generate pseudo-legal moves for all piece types, apply basic moves to create a new position, detect attacked squares, filter legal moves, and run basic perft. It does not yet implement all chess rules or play through UCI.
 
 ## Completed Work
 
@@ -21,6 +21,7 @@ Rookforge is in the early engine-core phase. The repository can parse positions,
 | 009 | Move application | Added `apply_move`, quiet move/capture/promotion handling, side-to-move and counter updates, castling-right updates, and `rookforge apply`. |
 | 010 | Attack detection | Added `is_square_attacked`, pawn/leaper/slider/queen/blocker coverage, side-to-move-independent tests, and `rookforge attacks`. |
 | 011 | Legal filtering | Added `find_king`, `is_in_check`, `generate_legal_moves`, check-detection tests, legal move filtering tests, and `rookforge movegen legal`. |
+| 012 | Basic perft | Added recursive legal-move `perft`, start-position depth 1 and 2 tests, pinned-piece perft coverage, and `rookforge perft --fen ... --depth ...`. |
 
 ## Public Commands Available
 
@@ -28,6 +29,8 @@ Rookforge is in the early engine-core phase. The repository can parse positions,
 rookforge --version
 rookforge help
 rookforge perft --help
+rookforge perft --fen startpos --depth 1
+rookforge perft --fen startpos --depth 2
 rookforge board --fen startpos
 rookforge move --parse e2e4
 rookforge movegen pawns --fen startpos
@@ -58,7 +61,7 @@ This runs formatting checks, clippy with warnings treated as errors, tests, buil
 - En passant capture
 - Unapply move transitions
 - Reversible move history
-- Real perft execution
+- Perft divide mode
 - Search
 - Evaluation
 - UCI engine protocol loop
@@ -68,4 +71,4 @@ This runs formatting checks, clippy with warnings treated as errors, tests, buil
 
 ## Next Recommended Execution
 
-Day 012 should add basic perft on top of legal move generation. That gives the project repeatable node-count validation before castling and en passant are introduced.
+Day 013 should add castling generation, castling legality checks, and castling move application.

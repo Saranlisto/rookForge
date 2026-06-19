@@ -37,7 +37,21 @@ fn perft_help_succeeds() {
     assert!(output.status.success());
     let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
     assert!(stdout.contains("rookforge perft"));
-    assert!(stdout.contains("not implemented"));
+    assert!(stdout.contains("--depth <DEPTH>"));
+}
+
+#[test]
+fn perft_startpos_depth_two_succeeds() {
+    let output = Command::new(env!("CARGO_BIN_EXE_rookforge"))
+        .args(["perft", "--fen", "startpos", "--depth", "2"])
+        .output()
+        .expect("run rookforge perft --fen startpos --depth 2");
+
+    assert!(output.status.success());
+    assert_eq!(
+        String::from_utf8(output.stdout).expect("utf8 stdout"),
+        "fen: startpos\ndepth: 2\nnodes: 400\n"
+    );
 }
 
 #[test]

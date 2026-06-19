@@ -15,12 +15,13 @@ For the public execution ledger, see [EXECUTION_STATUS.md](EXECUTION_STATUS.md).
 - Day 009: Basic move application for quiet moves, captures, promotions, counters, castling-right updates, CLI `apply`, and local smoke checks.
 - Day 010: Attack detection for pawns, knights, kings, sliders, queens, blockers, side-to-move independence, CLI `attacks`, and local smoke checks.
 - Day 011: King lookup, check detection, legal move filtering from pseudo-legal moves, CLI `movegen legal`, and local smoke checks.
+- Day 012: Basic recursive perft using legal moves, start-position depth 1 and 2 validation, CLI `perft --fen ... --depth ...`, and local smoke checks.
 
 ## Near-Term Plan
 
-1. Add perft execution with known validation positions.
-2. Add castling generation and application.
-3. Add en passant generation and application.
+1. Add castling generation and application.
+2. Add en passant generation and application.
+3. Add a hardened perft validation suite and divide mode.
 4. Add reversible move history and unapply scaffolding for search and perft.
 5. Add UCI protocol loop after core move generation is stable.
 

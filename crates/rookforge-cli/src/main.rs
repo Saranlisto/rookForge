@@ -4,8 +4,8 @@ use std::process::ExitCode;
 use rookforge_core::{
     apply_move, generate_bishop_moves, generate_king_moves, generate_knight_moves,
     generate_legal_moves, generate_pawn_moves, generate_pseudo_legal_moves, generate_queen_moves,
-    generate_rook_moves, is_square_attacked, Color, Move, PieceKind, Position, Square, ENGINE_NAME,
-    STARTING_POSITION_FEN,
+    generate_rook_moves, is_square_attacked, perft, Color, Move, PieceKind, Position, Square,
+    ENGINE_NAME, STARTING_POSITION_FEN,
 };
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -55,7 +55,8 @@ fn run(args: impl IntoIterator<Item = String>) -> Result<String, String> {
         ["movegen", "legal", "--fen", fen] => legal_moves_from_fen(fen),
         ["movegen", ..] => Err("invalid movegen command. Try `rookforge movegen --help`.".into()),
         ["perft", "help"] | ["perft", "--help"] | ["perft", "-h"] => Ok(perft_help_text()),
-        ["perft", ..] => Err("perft is not implemented yet. Try `rookforge perft --help`.".into()),
+        ["perft", "--fen", fen, "--depth", depth] => perft_from_fen(fen, depth),
+        ["perft", ..] => Err("invalid perft command. Try `rookforge perft --help`.".into()),
         [unknown, ..] => Err(format!(
             "unknown command `{unknown}`. Try `rookforge help`."
         )),
@@ -94,7 +95,7 @@ fn movegen_help_text() -> String {
 }
 
 fn perft_help_text() -> String {
-    "rookforge perft\n\nUSAGE:\n    rookforge perft --help\n\nSTATUS:\n    Perft execution is planned but not implemented in the scaffold.\n"
+    "rookforge perft\n\nUSAGE:\n    rookforge perft --fen <FEN|startpos> --depth <DEPTH>\n\nSTATUS:\n    Counts legal move-tree nodes for local move-generation validation.\n"
         .to_string()
 }
 
@@ -176,6 +177,16 @@ fn legal_moves_from_fen(fen: &str) -> Result<String, String> {
     movegen_moves_from_fen(fen, generate_legal_moves)
 }
 
+fn perft_from_fen(fen: &str, depth: &str) -> Result<String, String> {
+    let position = position_from_fen(fen)?;
+    let depth = depth
+        .parse::<u32>()
+        .map_err(|_| format!("invalid depth: {depth}"))?;
+    let nodes = perft(&position, depth);
+
+    Ok(format!("fen: {fen}\ndepth: {depth}\nnodes: {nodes}\n"))
+}
+
 fn movegen_moves_from_fen(
     fen: &str,
     generator: fn(&Position) -> Vec<Move>,
@@ -254,11 +265,25 @@ mod tests {
     }
 
     #[test]
-    fn perft_help_reports_scaffold_status() {
+    fn perft_help_reports_command_usage() {
         let output = run(["perft".to_string(), "--help".to_string()]).expect("perft help");
 
         assert!(output.contains("rookforge perft"));
-        assert!(output.contains("not implemented"));
+        assert!(output.contains("--depth <DEPTH>"));
+    }
+
+    #[test]
+    fn perft_command_reports_starting_position_nodes() {
+        let output = run([
+            "perft".to_string(),
+            "--fen".to_string(),
+            "startpos".to_string(),
+            "--depth".to_string(),
+            "2".to_string(),
+        ])
+        .expect("perft output");
+
+        assert_eq!(output, "fen: startpos\ndepth: 2\nnodes: 400\n");
     }
 
     #[test]
