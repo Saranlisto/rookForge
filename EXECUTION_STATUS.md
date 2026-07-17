@@ -4,7 +4,7 @@ This file is the public progress ledger for Rookforge. It summarizes what has be
 
 ## Current Snapshot
 
-Rookforge is in the early engine-core phase. The repository can parse positions, inspect boards, parse UCI-style moves, generate pseudo-legal moves for all piece types, apply basic moves to create a new position, detect attacked squares, filter legal moves, execute castling and en passant, and run basic perft. It does not yet play through UCI.
+Rookforge is in the early engine-core phase. The repository can parse positions, inspect boards, parse UCI-style moves, generate pseudo-legal moves for all piece types, apply basic moves to create a new position, detect attacked squares, filter legal moves, execute castling and en passant, and run perft validation with divide output. It does not yet play through UCI.
 
 ## Completed Work
 
@@ -24,6 +24,7 @@ Rookforge is in the early engine-core phase. The repository can parse positions,
 | 012 | Basic perft | Added recursive legal-move `perft`, start-position depth 1 and 2 tests, pinned-piece perft coverage, and `rookforge perft --fen ... --depth ...`. |
 | 013 | Castling | Added castling generation, castling attack/path legality checks, castling move application, castling-right updates, tests, and castling smoke checks. |
 | 014 | En passant | Added en passant generation, en passant capture application, target cleanup, discovered-check filtering, tests, and CLI smoke checks. |
+| 015 | Perft validation | Added Kiwipete perft reference tests, start-position depth 3 coverage, perft divide output, timing/throughput CLI fields, and `make perft`. |
 
 ## Public Commands Available
 
@@ -33,6 +34,7 @@ rookforge help
 rookforge perft --help
 rookforge perft --fen startpos --depth 1
 rookforge perft --fen startpos --depth 2
+rookforge perft --fen startpos --depth 2 --divide
 rookforge board --fen startpos
 rookforge move --parse e2e4
 rookforge movegen pawns --fen startpos
@@ -60,11 +62,16 @@ make check
 
 This runs formatting checks, clippy with warnings treated as errors, tests, build, and CLI smoke checks.
 
+Run deeper perft reference positions when changing move generation:
+
+```bash
+make perft
+```
+
 ## Intentionally Not Implemented Yet
 
 - Unapply move transitions
 - Reversible move history
-- Perft divide mode
 - Search
 - Evaluation
 - UCI engine protocol loop
@@ -74,4 +81,4 @@ This runs formatting checks, clippy with warnings treated as errors, tests, buil
 
 ## Next Recommended Execution
 
-Day 015 should add a hardened perft validation suite, divide mode, and a split between fast and deeper optional validation.
+Day 016 should add the first material-only static evaluation function and a CLI debug command for evaluating FEN positions.

@@ -275,6 +275,28 @@ pub fn perft(position: &Position, depth: u32) -> u64 {
         .sum()
 }
 
+/// Counts perft nodes for each legal root move at `depth`.
+///
+/// Depth 0 has no root moves, so the divide output is empty. At depth 1, each
+/// legal root move contributes one leaf node.
+#[must_use]
+pub fn perft_divide(position: &Position, depth: u32) -> Vec<(Move, u64)> {
+    if depth == 0 {
+        return Vec::new();
+    }
+
+    let mut rows = generate_legal_moves(position)
+        .into_iter()
+        .filter_map(|mv| {
+            apply_move(position, mv)
+                .ok()
+                .map(|candidate| (mv, perft(&candidate, depth - 1)))
+        })
+        .collect::<Vec<_>>();
+    rows.sort_by_key(|(mv, _)| mv.to_uci());
+    rows
+}
+
 /// Returns true when `square` is attacked by any piece of `by_color`.
 ///
 /// This ignores side to move, does not mutate the position, and does not check
@@ -1021,6 +1043,9 @@ impl std::error::Error for MoveApplyError {}
 mod tests {
     use super::*;
 
+    const KIWIPETE_FEN: &str =
+        "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1";
+
     fn square(value: &str) -> Square {
         Square::from_algebraic(value).expect("valid test square")
     }
@@ -1075,6 +1100,15 @@ mod tests {
         let position = Position::from_fen(fen).expect("valid test FEN");
 
         perft(&position, depth)
+    }
+
+    fn perft_divide_from_fen(fen: &str, depth: u32) -> Vec<(String, u64)> {
+        let position = Position::from_fen(fen).expect("valid test FEN");
+
+        perft_divide(&position, depth)
+            .into_iter()
+            .map(|(mv, nodes)| (mv.to_uci(), nodes))
+            .collect()
     }
 
     fn apply_move_from_uci(fen: &str, value: &str) -> Result<Position, MoveApplyError> {
@@ -2405,6 +2439,56 @@ mod tests {
     #[test]
     fn perft_depth_two_from_starting_position_is_four_hundred() {
         assert_eq!(perft_from_fen(crate::board::STARTING_POSITION_FEN, 2), 400);
+    }
+
+    #[test]
+    fn perft_depth_three_from_starting_position_is_eight_thousand_nine_hundred_two() {
+        assert_eq!(perft_from_fen(crate::board::STARTING_POSITION_FEN, 3), 8902);
+    }
+
+    #[test]
+    fn perft_kiwipete_depth_one_is_forty_eight() {
+        assert_eq!(perft_from_fen(KIWIPETE_FEN, 1), 48);
+    }
+
+    #[test]
+    fn perft_kiwipete_depth_two_is_two_thousand_thirty_nine() {
+        assert_eq!(perft_from_fen(KIWIPETE_FEN, 2), 2039);
+    }
+
+    #[test]
+    fn perft_divide_totals_match_normal_perft() {
+        let divide = perft_divide_from_fen(crate::board::STARTING_POSITION_FEN, 2);
+        let total = divide.iter().map(|(_, nodes)| *nodes).sum::<u64>();
+
+        assert_eq!(
+            total,
+            perft_from_fen(crate::board::STARTING_POSITION_FEN, 2)
+        );
+    }
+
+    #[test]
+    fn perft_divide_reports_starting_position_root_counts() {
+        let divide = perft_divide_from_fen(crate::board::STARTING_POSITION_FEN, 2);
+
+        assert_eq!(divide.len(), 20);
+        assert_eq!(divide.first(), Some(&("a2a3".to_string(), 20)));
+        assert_eq!(divide.last(), Some(&("h2h4".to_string(), 20)));
+    }
+
+    #[test]
+    fn kiwipete_preserves_all_castling_rights_in_position_state() {
+        let position = Position::from_fen(KIWIPETE_FEN).expect("valid Kiwipete FEN");
+
+        assert_eq!(
+            position.castling_rights(),
+            CastlingRights {
+                white_kingside: true,
+                white_queenside: true,
+                black_kingside: true,
+                black_queenside: true,
+            }
+        );
     }
 
     #[test]

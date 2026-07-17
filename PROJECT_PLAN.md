@@ -18,10 +18,11 @@ For the public execution ledger, see [EXECUTION_STATUS.md](EXECUTION_STATUS.md).
 - Day 012: Basic recursive perft using legal moves, start-position depth 1 and 2 validation, CLI `perft --fen ... --depth ...`, and local smoke checks.
 - Day 013: Castling generation, castling legality checks, castling move application, castling tests, and castling legal-move smoke checks.
 - Day 014: En passant target handling, en passant generation, en passant capture application, discovered-check filtering, tests, and local smoke checks.
+- Day 015: Hardened perft validation suite, Kiwipete reference counts, perft divide output, timing/throughput CLI fields, and `make perft`.
 
 ## Near-Term Plan
 
-1. Add a hardened perft validation suite and divide mode.
+1. Add material-only static evaluation.
 2. Add reversible move history and unapply scaffolding for search and perft.
 3. Add UCI protocol loop after core move generation is stable.
 

@@ -38,6 +38,7 @@ fn perft_help_succeeds() {
     let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
     assert!(stdout.contains("rookforge perft"));
     assert!(stdout.contains("--depth <DEPTH>"));
+    assert!(stdout.contains("--divide"));
 }
 
 #[test]
@@ -48,10 +49,26 @@ fn perft_startpos_depth_two_succeeds() {
         .expect("run rookforge perft --fen startpos --depth 2");
 
     assert!(output.status.success());
-    assert_eq!(
-        String::from_utf8(output.stdout).expect("utf8 stdout"),
-        "fen: startpos\ndepth: 2\nnodes: 400\n"
-    );
+    let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
+    assert!(stdout.contains("fen: startpos\n"));
+    assert!(stdout.contains("depth: 2\n"));
+    assert!(stdout.contains("nodes: 400\n"));
+    assert!(stdout.contains("elapsed: "));
+    assert!(stdout.contains("nodes_per_second: "));
+}
+
+#[test]
+fn perft_divide_startpos_depth_two_succeeds() {
+    let output = Command::new(env!("CARGO_BIN_EXE_rookforge"))
+        .args(["perft", "--fen", "startpos", "--depth", "2", "--divide"])
+        .output()
+        .expect("run rookforge perft --fen startpos --depth 2 --divide");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
+    assert!(stdout.contains("a2a3: 20\n"));
+    assert!(stdout.contains("e2e4: 20\n"));
+    assert!(stdout.contains("total: 400\n"));
 }
 
 #[test]

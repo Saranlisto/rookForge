@@ -1,11 +1,12 @@
 use std::env;
 use std::process::ExitCode;
+use std::time::{Duration, Instant};
 
 use rookforge_core::{
     apply_move, generate_bishop_moves, generate_king_moves, generate_knight_moves,
     generate_legal_moves, generate_pawn_moves, generate_pseudo_legal_moves, generate_queen_moves,
-    generate_rook_moves, is_square_attacked, perft, Color, Move, PieceKind, Position, Square,
-    ENGINE_NAME, STARTING_POSITION_FEN,
+    generate_rook_moves, is_square_attacked, perft, perft_divide, Color, Move, PieceKind, Position,
+    Square, ENGINE_NAME, STARTING_POSITION_FEN,
 };
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -56,6 +57,7 @@ fn run(args: impl IntoIterator<Item = String>) -> Result<String, String> {
         ["movegen", ..] => Err("invalid movegen command. Try `rookforge movegen --help`.".into()),
         ["perft", "help"] | ["perft", "--help"] | ["perft", "-h"] => Ok(perft_help_text()),
         ["perft", "--fen", fen, "--depth", depth] => perft_from_fen(fen, depth),
+        ["perft", "--fen", fen, "--depth", depth, "--divide"] => perft_divide_from_fen(fen, depth),
         ["perft", ..] => Err("invalid perft command. Try `rookforge perft --help`.".into()),
         [unknown, ..] => Err(format!(
             "unknown command `{unknown}`. Try `rookforge help`."
@@ -95,7 +97,7 @@ fn movegen_help_text() -> String {
 }
 
 fn perft_help_text() -> String {
-    "rookforge perft\n\nUSAGE:\n    rookforge perft --fen <FEN|startpos> --depth <DEPTH>\n\nSTATUS:\n    Counts legal move-tree nodes for local move-generation validation.\n"
+    "rookforge perft\n\nUSAGE:\n    rookforge perft --fen <FEN|startpos> --depth <DEPTH>\n    rookforge perft --fen <FEN|startpos> --depth <DEPTH> --divide\n\nSTATUS:\n    Counts legal move-tree nodes for local move-generation validation.\n"
         .to_string()
 }
 
@@ -179,12 +181,37 @@ fn legal_moves_from_fen(fen: &str) -> Result<String, String> {
 
 fn perft_from_fen(fen: &str, depth: &str) -> Result<String, String> {
     let position = position_from_fen(fen)?;
-    let depth = depth
-        .parse::<u32>()
-        .map_err(|_| format!("invalid depth: {depth}"))?;
+    let depth = depth_from_cli(depth)?;
+    let started_at = Instant::now();
     let nodes = perft(&position, depth);
+    let elapsed = started_at.elapsed();
 
-    Ok(format!("fen: {fen}\ndepth: {depth}\nnodes: {nodes}\n"))
+    Ok(format!(
+        "fen: {fen}\ndepth: {depth}\nnodes: {nodes}\nelapsed: {}\nnodes_per_second: {}\n",
+        format_duration(elapsed),
+        nodes_per_second(nodes, elapsed)
+    ))
+}
+
+fn perft_divide_from_fen(fen: &str, depth: &str) -> Result<String, String> {
+    let position = position_from_fen(fen)?;
+    let depth = depth_from_cli(depth)?;
+    let started_at = Instant::now();
+    let rows = perft_divide(&position, depth);
+    let elapsed = started_at.elapsed();
+    let total = rows.iter().map(|(_, nodes)| *nodes).sum::<u64>();
+
+    let mut output = format!("fen: {fen}\ndepth: {depth}\n");
+    for (mv, nodes) in rows {
+        output.push_str(&format!("{}: {nodes}\n", mv.to_uci()));
+    }
+    output.push_str(&format!(
+        "total: {total}\nelapsed: {}\nnodes_per_second: {}\n",
+        format_duration(elapsed),
+        nodes_per_second(total, elapsed)
+    ));
+
+    Ok(output)
 }
 
 fn movegen_moves_from_fen(
@@ -216,6 +243,26 @@ fn position_from_fen(fen: &str) -> Result<Position, String> {
     };
 
     Position::from_fen(fen).map_err(|error| format!("invalid FEN: {error}"))
+}
+
+fn depth_from_cli(depth: &str) -> Result<u32, String> {
+    depth
+        .parse::<u32>()
+        .map_err(|_| format!("invalid depth: {depth}"))
+}
+
+fn format_duration(duration: Duration) -> String {
+    format!("{:.6}s", duration.as_secs_f64())
+}
+
+fn nodes_per_second(nodes: u64, elapsed: Duration) -> u64 {
+    let seconds = elapsed.as_secs_f64();
+
+    if seconds == 0.0 {
+        nodes
+    } else {
+        (nodes as f64 / seconds).round() as u64
+    }
 }
 
 fn color_from_cli(value: &str) -> Result<Color, String> {
@@ -270,6 +317,7 @@ mod tests {
 
         assert!(output.contains("rookforge perft"));
         assert!(output.contains("--depth <DEPTH>"));
+        assert!(output.contains("--divide"));
     }
 
     #[test]
@@ -283,7 +331,30 @@ mod tests {
         ])
         .expect("perft output");
 
-        assert_eq!(output, "fen: startpos\ndepth: 2\nnodes: 400\n");
+        assert!(output.contains("fen: startpos\n"));
+        assert!(output.contains("depth: 2\n"));
+        assert!(output.contains("nodes: 400\n"));
+        assert!(output.contains("elapsed: "));
+        assert!(output.contains("nodes_per_second: "));
+    }
+
+    #[test]
+    fn perft_divide_command_reports_root_move_counts() {
+        let output = run([
+            "perft".to_string(),
+            "--fen".to_string(),
+            "startpos".to_string(),
+            "--depth".to_string(),
+            "2".to_string(),
+            "--divide".to_string(),
+        ])
+        .expect("perft divide output");
+
+        assert!(output.contains("fen: startpos\n"));
+        assert!(output.contains("depth: 2\n"));
+        assert!(output.contains("a2a3: 20\n"));
+        assert!(output.contains("e2e4: 20\n"));
+        assert!(output.contains("total: 400\n"));
     }
 
     #[test]

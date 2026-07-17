@@ -1,4 +1,4 @@
-.PHONY: fmt clippy test build smoke check
+.PHONY: fmt clippy test build smoke check perft
 
 fmt:
 	cargo fmt
@@ -18,6 +18,7 @@ smoke:
 	cargo run -- perft --help
 	cargo run -- perft --fen startpos --depth 1
 	cargo run -- perft --fen startpos --depth 2
+	cargo run -- perft --fen startpos --depth 2 --divide
 	cargo run -- board --fen startpos
 	cargo run -- board --fen "8/8/8/8/8/8/8/8 w - - 0 1"
 	cargo run -- move --parse e2e4
@@ -40,3 +41,7 @@ smoke:
 
 check:
 	./scripts/local-check.sh
+
+perft:
+	cargo run -- perft --fen startpos --depth 3
+	cargo run -- perft --fen "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1" --depth 2

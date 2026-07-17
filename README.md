@@ -34,7 +34,7 @@ Initial core modules:
 
 ## Current Status
 
-Rookforge is currently a production-grade scaffold with structural FEN parsing, board inspection helpers, UCI-style move parsing, combined pseudo-legal move generation, basic move application, attack detection, legal move filtering, castling, en passant, basic perft, and local debug commands. It does not play chess yet.
+Rookforge is currently a production-grade scaffold with structural FEN parsing, board inspection helpers, UCI-style move parsing, combined pseudo-legal move generation, basic move application, attack detection, legal move filtering, castling, en passant, perft validation, perft divide output, and local debug commands. It does not play chess yet.
 
 Execution completed to date:
 
@@ -54,6 +54,7 @@ Execution completed to date:
 | 012 | Recursive legal-move perft, start-position node tests, and `perft --fen ... --depth ...`. |
 | 013 | Castling generation, castling legality checks, castling application, and castling smoke coverage. |
 | 014 | En passant generation, en passant capture application, discovered-check filtering, and smoke coverage. |
+| 015 | Hardened perft validation, Kiwipete reference coverage, divide output, timing fields, and `make perft`. |
 
 Implemented:
 
@@ -77,6 +78,7 @@ Implemented:
 - Castling generation and application using normal king moves
 - En passant generation and capture application
 - Basic recursive perft using legal moves
+- Perft divide output for root-move node counts
 - Human-readable board display for debugging
 - Unit tests for the placeholder types
 - CLI tests for basic command behavior
@@ -87,17 +89,16 @@ Implemented:
 Intentionally not implemented yet:
 
 - Unapply/reversible move history
-- Perft divide mode
 - Search
 - Evaluation
 - UCI protocol handling
 
 ## Roadmap
 
-1. Add a hardened perft validation suite and divide mode.
+1. Add material-only static evaluation.
 2. Add reversible move history and unapply scaffolding.
 3. Add UCI command loop.
-4. Add search and evaluation.
+4. Add search.
 5. Add benchmarks and strength testing.
 6. Add Lichess bot bridge after the core engine is stable.
 
@@ -111,6 +112,12 @@ make check
 
 This runs formatting checks, clippy with warnings treated as errors, tests, build, and CLI smoke checks.
 
+Run deeper perft reference positions separately when touching move generation:
+
+```bash
+make perft
+```
+
 Useful local smoke commands:
 
 ```bash
@@ -118,6 +125,7 @@ cargo run -- board --fen startpos
 cargo run -- board --fen "8/8/8/8/8/8/8/8 w - - 0 1"
 cargo run -- perft --fen startpos --depth 1
 cargo run -- perft --fen startpos --depth 2
+cargo run -- perft --fen startpos --depth 2 --divide
 cargo run -- move --parse e2e4
 cargo run -- move --parse e7e8q
 cargo run -- movegen pawns --fen startpos
@@ -154,6 +162,7 @@ rookforge help
 rookforge perft --help
 rookforge perft --fen startpos --depth 1
 rookforge perft --fen startpos --depth 2
+rookforge perft --fen startpos --depth 2 --divide
 rookforge board --fen startpos
 rookforge move --parse e2e4
 rookforge movegen pawns --fen startpos
