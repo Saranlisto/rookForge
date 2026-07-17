@@ -5,8 +5,8 @@ use std::time::{Duration, Instant};
 use rookforge_core::{
     apply_move, evaluate, generate_bishop_moves, generate_king_moves, generate_knight_moves,
     generate_legal_moves, generate_pawn_moves, generate_pseudo_legal_moves, generate_queen_moves,
-    generate_rook_moves, is_square_attacked, perft, perft_divide, Color, Move, PieceKind, Position,
-    Square, ENGINE_NAME, STARTING_POSITION_FEN,
+    generate_rook_moves, is_square_attacked, perft, perft_divide, search_best_move, Color, Move,
+    PieceKind, Position, Square, ENGINE_NAME, STARTING_POSITION_FEN,
 };
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -62,6 +62,9 @@ fn run(args: impl IntoIterator<Item = String>) -> Result<String, String> {
         ["perft", "--fen", fen, "--depth", depth] => perft_from_fen(fen, depth),
         ["perft", "--fen", fen, "--depth", depth, "--divide"] => perft_divide_from_fen(fen, depth),
         ["perft", ..] => Err("invalid perft command. Try `rookforge perft --help`.".into()),
+        ["search", "help"] | ["search", "--help"] | ["search", "-h"] => Ok(search_help_text()),
+        ["search", "--fen", fen, "--depth", depth] => search_from_fen(fen, depth),
+        ["search", ..] => Err("invalid search command. Try `rookforge search --help`.".into()),
         [unknown, ..] => Err(format!(
             "unknown command `{unknown}`. Try `rookforge help`."
         )),
@@ -70,7 +73,7 @@ fn run(args: impl IntoIterator<Item = String>) -> Result<String, String> {
 
 fn help_text() -> String {
     format!(
-        "{ENGINE_NAME} chess engine scaffold\n\nUSAGE:\n    rookforge <COMMAND>\n\nCOMMANDS:\n    apply       Apply a move to a FEN position\n    attacks     Check whether a square is attacked\n    board       Print a FEN position as a board\n    eval        Evaluate a FEN position\n    help        Show this help text\n    move        Parse a UCI-style move\n    movegen     Generate selected pseudo-legal moves\n    perft       Inspect perft command options\n\nOPTIONS:\n    -h, --help      Show this help text\n    -V, --version   Show version information\n"
+        "{ENGINE_NAME} chess engine scaffold\n\nUSAGE:\n    rookforge <COMMAND>\n\nCOMMANDS:\n    apply       Apply a move to a FEN position\n    attacks     Check whether a square is attacked\n    board       Print a FEN position as a board\n    eval        Evaluate a FEN position\n    help        Show this help text\n    move        Parse a UCI-style move\n    movegen     Generate selected pseudo-legal moves\n    perft       Inspect perft command options\n    search      Search a FEN position\n\nOPTIONS:\n    -h, --help      Show this help text\n    -V, --version   Show version information\n"
     )
 }
 
@@ -106,6 +109,11 @@ fn movegen_help_text() -> String {
 
 fn perft_help_text() -> String {
     "rookforge perft\n\nUSAGE:\n    rookforge perft --fen <FEN|startpos> --depth <DEPTH>\n    rookforge perft --fen <FEN|startpos> --depth <DEPTH> --divide\n\nSTATUS:\n    Counts legal move-tree nodes for local move-generation validation.\n"
+        .to_string()
+}
+
+fn search_help_text() -> String {
+    "rookforge search\n\nUSAGE:\n    rookforge search --fen <FEN|startpos> --depth <DEPTH>\n\nSTATUS:\n    Searches a position with plain fixed-depth negamax.\n"
         .to_string()
 }
 
@@ -231,6 +239,20 @@ fn perft_divide_from_fen(fen: &str, depth: &str) -> Result<String, String> {
     Ok(output)
 }
 
+fn search_from_fen(fen: &str, depth: &str) -> Result<String, String> {
+    let position = position_from_fen(fen)?;
+    let depth = depth_from_cli(depth)?;
+    let result = search_best_move(&position, depth);
+    let best_move = result
+        .best_move
+        .map_or_else(|| "none".to_string(), |mv| mv.to_uci());
+
+    Ok(format!(
+        "fen: {fen}\ndepth: {}\nbest_move: {best_move}\nscore_cp: {}\nnodes: {}\n",
+        result.depth, result.score_cp, result.nodes
+    ))
+}
+
 fn movegen_moves_from_fen(
     fen: &str,
     generator: fn(&Position) -> Vec<Move>,
@@ -327,6 +349,7 @@ mod tests {
         assert!(output.contains("attacks"));
         assert!(output.contains("eval"));
         assert!(output.contains("perft"));
+        assert!(output.contains("search"));
     }
 
     #[test]
@@ -374,6 +397,50 @@ mod tests {
         assert!(output.contains("rookforge perft"));
         assert!(output.contains("--depth <DEPTH>"));
         assert!(output.contains("--divide"));
+    }
+
+    #[test]
+    fn search_help_reports_command_usage() {
+        let output = run(["search".to_string(), "--help".to_string()]).expect("search help");
+
+        assert!(output.contains("rookforge search"));
+        assert!(output.contains("--depth <DEPTH>"));
+    }
+
+    #[test]
+    fn search_command_reports_starting_position_result() {
+        let output = run([
+            "search".to_string(),
+            "--fen".to_string(),
+            "startpos".to_string(),
+            "--depth".to_string(),
+            "1".to_string(),
+        ])
+        .expect("search output");
+
+        assert!(output.contains("fen: startpos\n"));
+        assert!(output.contains("depth: 1\n"));
+        assert!(output.contains("best_move: "));
+        assert!(!output.contains("best_move: none"));
+        assert!(output.contains("score_cp: 0\n"));
+        assert!(output.contains("nodes: 20\n"));
+    }
+
+    #[test]
+    fn search_command_reports_no_move_for_empty_position() {
+        let output = run([
+            "search".to_string(),
+            "--fen".to_string(),
+            "8/8/8/8/8/8/8/8 w - - 0 1".to_string(),
+            "--depth".to_string(),
+            "1".to_string(),
+        ])
+        .expect("search output");
+
+        assert_eq!(
+            output,
+            "fen: 8/8/8/8/8/8/8/8 w - - 0 1\ndepth: 1\nbest_move: none\nscore_cp: 0\nnodes: 1\n"
+        );
     }
 
     #[test]

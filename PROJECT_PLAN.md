@@ -20,16 +20,21 @@ For the public execution ledger, see [EXECUTION_STATUS.md](EXECUTION_STATUS.md).
 - Day 014: En passant target handling, en passant generation, en passant capture application, discovered-check filtering, tests, and local smoke checks.
 - Day 015: Hardened perft validation suite, Kiwipete reference counts, perft divide output, timing/throughput CLI fields, and `make perft`.
 - Day 016: Material-only static evaluation, white-positive centipawn convention, evaluation tests, CLI `eval --fen`, and local smoke checks.
+- Day 017: Fixed-depth negamax search, best-move selection, side-to-move score convention, CLI `search --fen ... --depth ...`, and local smoke checks.
 
 ## Near-Term Plan
 
-1. Add reversible move history and unapply scaffolding for search and perft.
-2. Add UCI protocol loop after core move generation is stable.
-3. Add first search scaffolding after command protocol and move history are ready.
+1. Add alpha-beta pruning.
+2. Add terminal-state handling for checkmate and stalemate.
+3. Add basic move ordering.
+4. Add reversible move history and unapply scaffolding for search and perft.
+5. Add UCI protocol loop after core move generation is stable.
 
 ## Deferred
 
-- Search
+- Quiescence search
+- Transposition tables
+- Iterative deepening
 - Advanced evaluation terms
 - Opening books
 - Lichess integration
