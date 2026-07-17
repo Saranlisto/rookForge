@@ -7,6 +7,8 @@ cargo test
 cargo build
 cargo run -- --version
 cargo run -- help
+cargo run -- eval --fen startpos
+cargo run -- eval --fen "8/8/8/8/8/8/4P3/4K2k w - - 0 1"
 cargo run -- perft --help
 cargo run -- perft --fen startpos --depth 1
 cargo run -- perft --fen startpos --depth 2

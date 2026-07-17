@@ -29,12 +29,12 @@ Initial core modules:
 - `board`: board-level primitives such as colors, piece kinds, pieces, and squares
 - `movegen`: move vocabulary, pseudo-legal generation, attack detection, and later legal move generation
 - `search`: future search algorithms
-- `eval`: future handcrafted evaluation
+- `eval`: material-only static evaluation, later handcrafted evaluation terms
 - `uci`: future Universal Chess Interface support
 
 ## Current Status
 
-Rookforge is currently a production-grade scaffold with structural FEN parsing, board inspection helpers, UCI-style move parsing, combined pseudo-legal move generation, basic move application, attack detection, legal move filtering, castling, en passant, perft validation, perft divide output, and local debug commands. It does not play chess yet.
+Rookforge is currently a production-grade scaffold with structural FEN parsing, board inspection helpers, UCI-style move parsing, combined pseudo-legal move generation, basic move application, attack detection, legal move filtering, castling, en passant, perft validation, perft divide output, material-only evaluation, and local debug commands. It does not play chess yet.
 
 Execution completed to date:
 
@@ -55,6 +55,7 @@ Execution completed to date:
 | 013 | Castling generation, castling legality checks, castling application, and castling smoke coverage. |
 | 014 | En passant generation, en passant capture application, discovered-check filtering, and smoke coverage. |
 | 015 | Hardened perft validation, Kiwipete reference coverage, divide output, timing fields, and `make perft`. |
+| 016 | Material-only static evaluation, white-positive score convention, evaluation tests, and `eval --fen`. |
 
 Implemented:
 
@@ -79,6 +80,7 @@ Implemented:
 - En passant generation and capture application
 - Basic recursive perft using legal moves
 - Perft divide output for root-move node counts
+- Material-only static evaluation with a white-positive centipawn convention
 - Human-readable board display for debugging
 - Unit tests for the placeholder types
 - CLI tests for basic command behavior
@@ -86,19 +88,38 @@ Implemented:
 - Rust GitHub Actions workflow
 - Initial architecture and devlog docs
 
+Evaluation convention:
+
+```text
+Positive score = better for White
+Negative score = better for Black
+Zero = equal material
+```
+
+Material values:
+
+| Piece | Centipawns |
+| --- | ---: |
+| Pawn | 100 |
+| Knight | 320 |
+| Bishop | 330 |
+| Rook | 500 |
+| Queen | 900 |
+| King | 0 |
+
 Intentionally not implemented yet:
 
 - Unapply/reversible move history
 - Search
-- Evaluation
+- Piece-square tables, mobility, king safety, and other advanced evaluation terms
 - UCI protocol handling
 
 ## Roadmap
 
-1. Add material-only static evaluation.
-2. Add reversible move history and unapply scaffolding.
-3. Add UCI command loop.
-4. Add search.
+1. Add reversible move history and unapply scaffolding.
+2. Add UCI command loop.
+3. Add search.
+4. Add deeper handcrafted evaluation terms.
 5. Add benchmarks and strength testing.
 6. Add Lichess bot bridge after the core engine is stable.
 
@@ -123,6 +144,8 @@ Useful local smoke commands:
 ```bash
 cargo run -- board --fen startpos
 cargo run -- board --fen "8/8/8/8/8/8/8/8 w - - 0 1"
+cargo run -- eval --fen startpos
+cargo run -- eval --fen "8/8/8/8/8/8/4P3/4K2k w - - 0 1"
 cargo run -- perft --fen startpos --depth 1
 cargo run -- perft --fen startpos --depth 2
 cargo run -- perft --fen startpos --depth 2 --divide
@@ -164,6 +187,8 @@ rookforge perft --fen startpos --depth 1
 rookforge perft --fen startpos --depth 2
 rookforge perft --fen startpos --depth 2 --divide
 rookforge board --fen startpos
+rookforge eval --fen startpos
+rookforge eval --fen "8/8/8/8/8/8/4P3/4K2k w - - 0 1"
 rookforge move --parse e2e4
 rookforge movegen pawns --fen startpos
 rookforge movegen knights --fen startpos

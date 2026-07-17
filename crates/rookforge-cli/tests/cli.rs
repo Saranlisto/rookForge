@@ -72,6 +72,34 @@ fn perft_divide_startpos_depth_two_succeeds() {
 }
 
 #[test]
+fn eval_startpos_succeeds() {
+    let output = Command::new(env!("CARGO_BIN_EXE_rookforge"))
+        .args(["eval", "--fen", "startpos"])
+        .output()
+        .expect("run rookforge eval --fen startpos");
+
+    assert!(output.status.success());
+    assert_eq!(
+        String::from_utf8(output.stdout).expect("utf8 stdout"),
+        "fen: startpos\nscore_cp: 0\nperspective: white-positive\n"
+    );
+}
+
+#[test]
+fn eval_extra_white_pawn_succeeds() {
+    let output = Command::new(env!("CARGO_BIN_EXE_rookforge"))
+        .args(["eval", "--fen", "8/8/8/8/8/8/4P3/4K2k w - - 0 1"])
+        .output()
+        .expect("run rookforge eval --fen extra white pawn");
+
+    assert!(output.status.success());
+    assert_eq!(
+        String::from_utf8(output.stdout).expect("utf8 stdout"),
+        "fen: 8/8/8/8/8/8/4P3/4K2k w - - 0 1\nscore_cp: 100\nperspective: white-positive\n"
+    );
+}
+
+#[test]
 fn board_startpos_succeeds() {
     let output = Command::new(env!("CARGO_BIN_EXE_rookforge"))
         .args(["board", "--fen", "startpos"])

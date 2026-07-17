@@ -4,7 +4,7 @@ This file is the public progress ledger for Rookforge. It summarizes what has be
 
 ## Current Snapshot
 
-Rookforge is in the early engine-core phase. The repository can parse positions, inspect boards, parse UCI-style moves, generate pseudo-legal moves for all piece types, apply basic moves to create a new position, detect attacked squares, filter legal moves, execute castling and en passant, and run perft validation with divide output. It does not yet play through UCI.
+Rookforge is in the early engine-core phase. The repository can parse positions, inspect boards, parse UCI-style moves, generate pseudo-legal moves for all piece types, apply basic moves to create a new position, detect attacked squares, filter legal moves, execute castling and en passant, run perft validation with divide output, and evaluate material. It does not yet play through UCI.
 
 ## Completed Work
 
@@ -25,12 +25,15 @@ Rookforge is in the early engine-core phase. The repository can parse positions,
 | 013 | Castling | Added castling generation, castling attack/path legality checks, castling move application, castling-right updates, tests, and castling smoke checks. |
 | 014 | En passant | Added en passant generation, en passant capture application, target cleanup, discovered-check filtering, tests, and CLI smoke checks. |
 | 015 | Perft validation | Added Kiwipete perft reference tests, start-position depth 3 coverage, perft divide output, timing/throughput CLI fields, and `make perft`. |
+| 016 | Material evaluation | Added material-only static evaluation, white-positive centipawn convention, material value constants, evaluation tests, and `rookforge eval --fen ...`. |
 
 ## Public Commands Available
 
 ```bash
 rookforge --version
 rookforge help
+rookforge eval --fen startpos
+rookforge eval --fen "8/8/8/8/8/8/4P3/4K2k w - - 0 1"
 rookforge perft --help
 rookforge perft --fen startpos --depth 1
 rookforge perft --fen startpos --depth 2
@@ -73,7 +76,7 @@ make perft
 - Unapply move transitions
 - Reversible move history
 - Search
-- Evaluation
+- Piece-square tables, mobility, king safety, and other advanced evaluation terms
 - UCI engine protocol loop
 - Opening books
 - Lichess integration
@@ -81,4 +84,4 @@ make perft
 
 ## Next Recommended Execution
 
-Day 016 should add the first material-only static evaluation function and a CLI debug command for evaluating FEN positions.
+Day 017 should add reversible move history or unapply scaffolding so future perft and search work can avoid cloning full positions at every node.

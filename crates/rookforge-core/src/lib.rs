@@ -12,6 +12,10 @@ pub mod uci;
 pub use board::{
     CastlingRights, Color, FenParseError, Piece, PieceKind, Position, Square, STARTING_POSITION_FEN,
 };
+pub use eval::{
+    evaluate, material_value, BISHOP_VALUE, KING_VALUE, KNIGHT_VALUE, PAWN_VALUE, QUEEN_VALUE,
+    ROOK_VALUE,
+};
 pub use movegen::{
     apply_move, find_king, generate_bishop_moves, generate_castling_moves, generate_king_moves,
     generate_knight_moves, generate_legal_moves, generate_non_sliding_moves, generate_pawn_moves,

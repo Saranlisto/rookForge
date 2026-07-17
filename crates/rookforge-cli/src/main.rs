@@ -3,7 +3,7 @@ use std::process::ExitCode;
 use std::time::{Duration, Instant};
 
 use rookforge_core::{
-    apply_move, generate_bishop_moves, generate_king_moves, generate_knight_moves,
+    apply_move, evaluate, generate_bishop_moves, generate_king_moves, generate_knight_moves,
     generate_legal_moves, generate_pawn_moves, generate_pseudo_legal_moves, generate_queen_moves,
     generate_rook_moves, is_square_attacked, perft, perft_divide, Color, Move, PieceKind, Position,
     Square, ENGINE_NAME, STARTING_POSITION_FEN,
@@ -42,6 +42,9 @@ fn run(args: impl IntoIterator<Item = String>) -> Result<String, String> {
         ["board", "help"] | ["board", "--help"] | ["board", "-h"] => Ok(board_help_text()),
         ["board", "--fen", fen] => board_from_fen(fen),
         ["board", ..] => Err("invalid board command. Try `rookforge board --help`.".into()),
+        ["eval", "help"] | ["eval", "--help"] | ["eval", "-h"] => Ok(eval_help_text()),
+        ["eval", "--fen", fen] => eval_from_fen(fen),
+        ["eval", ..] => Err("invalid eval command. Try `rookforge eval --help`.".into()),
         ["move", "help"] | ["move", "--help"] | ["move", "-h"] => Ok(move_help_text()),
         ["move", "--parse", value] => move_from_uci(value),
         ["move", ..] => Err("invalid move command. Try `rookforge move --help`.".into()),
@@ -67,7 +70,7 @@ fn run(args: impl IntoIterator<Item = String>) -> Result<String, String> {
 
 fn help_text() -> String {
     format!(
-        "{ENGINE_NAME} chess engine scaffold\n\nUSAGE:\n    rookforge <COMMAND>\n\nCOMMANDS:\n    apply       Apply a move to a FEN position\n    attacks     Check whether a square is attacked\n    board       Print a FEN position as a board\n    help        Show this help text\n    move        Parse a UCI-style move\n    movegen     Generate selected pseudo-legal moves\n    perft       Inspect perft command options\n\nOPTIONS:\n    -h, --help      Show this help text\n    -V, --version   Show version information\n"
+        "{ENGINE_NAME} chess engine scaffold\n\nUSAGE:\n    rookforge <COMMAND>\n\nCOMMANDS:\n    apply       Apply a move to a FEN position\n    attacks     Check whether a square is attacked\n    board       Print a FEN position as a board\n    eval        Evaluate a FEN position\n    help        Show this help text\n    move        Parse a UCI-style move\n    movegen     Generate selected pseudo-legal moves\n    perft       Inspect perft command options\n\nOPTIONS:\n    -h, --help      Show this help text\n    -V, --version   Show version information\n"
     )
 }
 
@@ -83,6 +86,11 @@ fn attacks_help_text() -> String {
 
 fn board_help_text() -> String {
     "rookforge board\n\nUSAGE:\n    rookforge board --fen <FEN|startpos>\n\nSTATUS:\n    Prints a parsed FEN position as a human-readable board for local debugging.\n"
+        .to_string()
+}
+
+fn eval_help_text() -> String {
+    "rookforge eval\n\nUSAGE:\n    rookforge eval --fen <FEN|startpos>\n\nSTATUS:\n    Evaluates a position with the current material-only static evaluator.\n"
         .to_string()
 }
 
@@ -103,6 +111,15 @@ fn perft_help_text() -> String {
 
 fn board_from_fen(fen: &str) -> Result<String, String> {
     position_from_fen(fen).map(|position| format!("{}\n", position.to_pretty_string()))
+}
+
+fn eval_from_fen(fen: &str) -> Result<String, String> {
+    let position = position_from_fen(fen)?;
+    let score = evaluate(&position);
+
+    Ok(format!(
+        "fen: {fen}\nscore_cp: {score}\nperspective: white-positive\n"
+    ))
 }
 
 fn apply_move_from_fen(fen: &str, value: &str) -> Result<String, String> {
@@ -308,7 +325,46 @@ mod tests {
 
         assert!(output.contains("COMMANDS:"));
         assert!(output.contains("attacks"));
+        assert!(output.contains("eval"));
         assert!(output.contains("perft"));
+    }
+
+    #[test]
+    fn eval_help_reports_command_usage() {
+        let output = run(["eval".to_string(), "--help".to_string()]).expect("eval help");
+
+        assert!(output.contains("rookforge eval"));
+        assert!(output.contains("--fen <FEN|startpos>"));
+    }
+
+    #[test]
+    fn eval_command_reports_starting_position_score() {
+        let output = run([
+            "eval".to_string(),
+            "--fen".to_string(),
+            "startpos".to_string(),
+        ])
+        .expect("eval output");
+
+        assert_eq!(
+            output,
+            "fen: startpos\nscore_cp: 0\nperspective: white-positive\n"
+        );
+    }
+
+    #[test]
+    fn eval_command_reports_material_advantage() {
+        let output = run([
+            "eval".to_string(),
+            "--fen".to_string(),
+            "8/8/8/8/8/8/4P3/4K2k w - - 0 1".to_string(),
+        ])
+        .expect("eval output");
+
+        assert_eq!(
+            output,
+            "fen: 8/8/8/8/8/8/4P3/4K2k w - - 0 1\nscore_cp: 100\nperspective: white-positive\n"
+        );
     }
 
     #[test]
