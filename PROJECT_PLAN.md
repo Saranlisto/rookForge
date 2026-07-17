@@ -17,13 +17,13 @@ For the public execution ledger, see [EXECUTION_STATUS.md](EXECUTION_STATUS.md).
 - Day 011: King lookup, check detection, legal move filtering from pseudo-legal moves, CLI `movegen legal`, and local smoke checks.
 - Day 012: Basic recursive perft using legal moves, start-position depth 1 and 2 validation, CLI `perft --fen ... --depth ...`, and local smoke checks.
 - Day 013: Castling generation, castling legality checks, castling move application, castling tests, and castling legal-move smoke checks.
+- Day 014: En passant target handling, en passant generation, en passant capture application, discovered-check filtering, tests, and local smoke checks.
 
 ## Near-Term Plan
 
-1. Add en passant generation and application.
-2. Add a hardened perft validation suite and divide mode.
-3. Add reversible move history and unapply scaffolding for search and perft.
-4. Add UCI protocol loop after core move generation is stable.
+1. Add a hardened perft validation suite and divide mode.
+2. Add reversible move history and unapply scaffolding for search and perft.
+3. Add UCI protocol loop after core move generation is stable.
 
 ## Deferred
 

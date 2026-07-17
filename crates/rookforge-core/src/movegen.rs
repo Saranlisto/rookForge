@@ -46,8 +46,9 @@ const QUEEN_DIRECTIONS: [(i8, i8); 8] = [
 
 /// Generates pseudo-legal pawn moves for the side to move.
 ///
-/// This intentionally does not check king safety, en passant, or full move
-/// legality. It only applies pawn movement structure against current occupancy.
+/// This intentionally does not check king safety or full move legality. It
+/// applies pawn movement structure, captures, promotions, and en passant target
+/// captures against current position state.
 #[must_use]
 pub fn generate_pawn_moves(position: &Position) -> Vec<Move> {
     let side_to_move = position.side_to_move();
@@ -117,8 +118,8 @@ pub fn generate_sliding_piece_moves(position: &Position) -> Vec<Move> {
 
 /// Generates all currently implemented pseudo-legal moves for the side to move.
 ///
-/// This intentionally excludes castling, en passant, check detection, and legal
-/// move filtering. The output order is deterministic by piece family.
+/// This intentionally excludes castling, check detection, and legal move
+/// filtering. The output order is deterministic by piece family.
 #[must_use]
 pub fn generate_pseudo_legal_moves(position: &Position) -> Vec<Move> {
     let mut moves = generate_pawn_moves(position);
@@ -151,8 +152,7 @@ pub fn is_in_check(position: &Position, color: Color) -> bool {
 /// Generates currently supported legal moves for the side to move.
 ///
 /// This filters pseudo-legal moves by applying each move and rejecting any move
-/// that leaves the moving side's king in check. Castling and en passant are not
-/// generated yet.
+/// that leaves the moving side's king in check.
 #[must_use]
 pub fn generate_legal_moves(position: &Position) -> Vec<Move> {
     let moving_side = position.side_to_move();
@@ -255,8 +255,7 @@ pub fn generate_castling_moves(position: &Position) -> Vec<Move> {
 /// Counts legal move-tree leaf nodes to `depth`.
 ///
 /// Depth 0 counts the current node as one. Deeper depths recursively apply
-/// legal moves and sum each child node count. Castling and en passant are not
-/// available until those rules are implemented in legal move generation.
+/// legal moves and sum each child node count.
 #[must_use]
 pub fn perft(position: &Position, depth: u32) -> u64 {
     if depth == 0 {
@@ -317,10 +316,13 @@ pub fn apply_move(position: &Position, mv: Move) -> Result<Position, MoveApplyEr
         .piece_at(mv.from)
         .ok_or(MoveApplyError::EmptySourceSquare { source: mv.from })?;
     let castling_rook_move = castling_rook_move(moving_piece, mv);
+    let en_passant_capture_square = en_passant_capture_square(position, moving_piece, mv);
     let captured_piece = if castling_rook_move.is_some() {
         None
     } else {
-        position.piece_at(mv.to)
+        en_passant_capture_square
+            .and_then(|square| position.piece_at(square))
+            .or_else(|| position.piece_at(mv.to))
     };
     let placed_piece = piece_after_promotion(moving_piece, mv.promotion)?;
     let moving_side = position.side_to_move();
@@ -330,11 +332,19 @@ pub fn apply_move(position: &Position, mv: Move) -> Result<Position, MoveApplyEr
 
     update_castling_rights_for_move(&mut castling_rights, moving_piece, mv.from);
     if let Some(piece) = captured_piece {
-        update_castling_rights_for_capture(&mut castling_rights, piece, mv.to);
+        update_castling_rights_for_capture(
+            &mut castling_rights,
+            piece,
+            en_passant_capture_square.unwrap_or(mv.to),
+        );
     }
 
     next.clear_square(mv.from);
     next.set_piece(mv.to, placed_piece);
+
+    if let Some(square) = en_passant_capture_square {
+        next.clear_square(square);
+    }
 
     if let Some((rook_from, rook_to)) = castling_rook_move {
         let rook = position
@@ -405,6 +415,30 @@ fn en_passant_target_after_move(moving_piece: Piece, mv: Move) -> Option<Square>
     } else {
         None
     }
+}
+
+fn en_passant_capture_square(position: &Position, moving_piece: Piece, mv: Move) -> Option<Square> {
+    if moving_piece.kind != PieceKind::Pawn
+        || position.en_passant_target() != Some(mv.to)
+        || position.piece_at(mv.to).is_some()
+        || mv.from.file().abs_diff(mv.to.file()) != 1
+    {
+        return None;
+    }
+
+    let captured_square = en_passant_captured_pawn_square(moving_piece.color, mv.to)?;
+
+    if position.piece_at(captured_square)
+        == Some(Piece::new(moving_piece.color.opposite(), PieceKind::Pawn))
+    {
+        Some(captured_square)
+    } else {
+        None
+    }
+}
+
+fn en_passant_captured_pawn_square(color: Color, target: Square) -> Option<Square> {
+    offset_square(target, 0, -pawn_direction(color))
 }
 
 fn update_castling_rights_for_move(rights: &mut CastlingRights, moving_piece: Piece, from: Square) {
@@ -709,10 +743,22 @@ fn add_pawn_captures(position: &Position, color: Color, from: Square, moves: &mu
             continue;
         };
 
-        if matches!(position.piece_at(target), Some(piece) if piece.color == color.opposite()) {
+        if matches!(position.piece_at(target), Some(piece) if piece.color == color.opposite())
+            || is_en_passant_capture_target(position, color, target)
+        {
             add_pawn_move(from, target, moves);
         }
     }
+}
+
+fn is_en_passant_capture_target(position: &Position, color: Color, target: Square) -> bool {
+    if position.en_passant_target() != Some(target) || position.piece_at(target).is_some() {
+        return false;
+    }
+
+    en_passant_captured_pawn_square(color, target)
+        .and_then(|captured_square| position.piece_at(captured_square))
+        == Some(Piece::new(color.opposite(), PieceKind::Pawn))
 }
 
 fn add_pawn_move(from: Square, to: Square, moves: &mut Vec<Move>) {
@@ -2540,5 +2586,95 @@ mod tests {
 
         assert!(moves.contains(&"e1g1".to_string()));
         assert!(moves.contains(&"e1c1".to_string()));
+    }
+
+    #[test]
+    fn non_double_pawn_move_clears_en_passant_target() {
+        let result = apply_move_from_uci(
+            "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1",
+            "g8f6",
+        )
+        .expect("move applies");
+
+        assert_eq!(result.en_passant_target(), None);
+    }
+
+    #[test]
+    fn white_en_passant_capture_is_generated() {
+        let moves = legal_moves_from_fen("8/8/8/3pP3/8/8/8/4K2k w - d6 0 1");
+
+        assert!(moves.contains(&"e5d6".to_string()));
+    }
+
+    #[test]
+    fn black_en_passant_capture_is_generated() {
+        let moves = legal_moves_from_fen("4k2K/8/8/8/3pP3/8/8/8 b - e3 0 1");
+
+        assert!(moves.contains(&"d4e3".to_string()));
+    }
+
+    #[test]
+    fn white_en_passant_capture_removes_captured_pawn() {
+        let result = apply_move_from_uci("8/8/8/3pP3/8/8/8/4K2k w - d6 12 1", "e5d6")
+            .expect("en passant applies");
+
+        assert_eq!(
+            result.piece_at(square("d6")),
+            Some(Piece::new(Color::White, PieceKind::Pawn))
+        );
+        assert_eq!(result.piece_at(square("d5")), None);
+        assert_eq!(result.piece_at(square("e5")), None);
+    }
+
+    #[test]
+    fn black_en_passant_capture_removes_captured_pawn() {
+        let result = apply_move_from_uci("4k2K/8/8/8/3pP3/8/8/8 b - e3 12 1", "d4e3")
+            .expect("en passant applies");
+
+        assert_eq!(
+            result.piece_at(square("e3")),
+            Some(Piece::new(Color::Black, PieceKind::Pawn))
+        );
+        assert_eq!(result.piece_at(square("e4")), None);
+        assert_eq!(result.piece_at(square("d4")), None);
+    }
+
+    #[test]
+    fn en_passant_resets_halfmove_clock() {
+        let result = apply_move_from_uci("8/8/8/3pP3/8/8/8/4K2k w - d6 12 1", "e5d6")
+            .expect("en passant applies");
+
+        assert_eq!(result.halfmove_clock(), 0);
+    }
+
+    #[test]
+    fn en_passant_clears_en_passant_target() {
+        let result = apply_move_from_uci("8/8/8/3pP3/8/8/8/4K2k w - d6 12 1", "e5d6")
+            .expect("en passant applies");
+
+        assert_eq!(result.en_passant_target(), None);
+    }
+
+    #[test]
+    fn en_passant_is_not_generated_without_target_square() {
+        let moves = legal_moves_from_fen("8/8/8/3pP3/8/8/8/4K2k w - - 0 1");
+
+        assert!(!moves.contains(&"e5d6".to_string()));
+    }
+
+    #[test]
+    fn en_passant_is_not_generated_for_wrong_side() {
+        let moves = legal_moves_from_fen("8/8/8/3pP3/8/8/8/4K2k b - d6 0 1");
+
+        assert!(!moves.contains(&"e5d6".to_string()));
+    }
+
+    #[test]
+    fn illegal_en_passant_exposing_own_king_is_filtered_out() {
+        let pseudo_moves = pawn_moves_from_fen("k7/8/8/4KPpr/8/8/8/8 w - g6 0 1");
+        let legal_moves = legal_moves_from_fen("k7/8/8/4KPpr/8/8/8/8 w - g6 0 1");
+
+        assert!(pseudo_moves.contains(&"f5g6".to_string()));
+        assert!(!legal_moves.contains(&"f5g6".to_string()));
     }
 }

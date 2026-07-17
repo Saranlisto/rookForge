@@ -23,7 +23,9 @@ cargo run -- movegen queens --fen "8/8/8/3Q4/8/8/8/8 w - - 0 1"
 cargo run -- movegen all --fen startpos
 cargo run -- movegen legal --fen startpos
 cargo run -- movegen legal --fen "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1"
+cargo run -- movegen legal --fen "8/8/8/3pP3/8/8/8/4K2k w - d6 0 1"
 cargo run -- apply --fen startpos --move e2e4
+cargo run -- apply --fen "8/8/8/3pP3/8/8/8/4K2k w - d6 0 1" --move e5d6
 cargo run -- attacks --fen "4r3/8/8/8/4K3/8/8/8 w - - 0 1" --square e4 --by black
 cargo run -- attacks --fen startpos --square e4 --by black
 cargo run -- attacks --fen startpos --square e4 --by white

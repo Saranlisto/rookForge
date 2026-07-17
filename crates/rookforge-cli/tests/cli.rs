@@ -95,6 +95,25 @@ fn apply_e2e4_succeeds() {
 }
 
 #[test]
+fn apply_en_passant_succeeds() {
+    let output = Command::new(env!("CARGO_BIN_EXE_rookforge"))
+        .args([
+            "apply",
+            "--fen",
+            "8/8/8/3pP3/8/8/8/4K2k w - d6 0 1",
+            "--move",
+            "e5d6",
+        ])
+        .output()
+        .expect("run rookforge apply --fen en-passant --move e5d6");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
+    assert!(stdout.contains("fen: 8/8/3P4/8/8/8/8/4K2k b - - 0 1"));
+    assert!(stdout.contains("6 . . . P . . . ."));
+}
+
+#[test]
 fn attacks_command_succeeds() {
     let output = Command::new(env!("CARGO_BIN_EXE_rookforge"))
         .args([
@@ -278,4 +297,21 @@ fn movegen_legal_castling_position_succeeds() {
     let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
     assert!(stdout.contains("e1g1"));
     assert!(stdout.contains("e1c1"));
+}
+
+#[test]
+fn movegen_legal_en_passant_position_succeeds() {
+    let output = Command::new(env!("CARGO_BIN_EXE_rookforge"))
+        .args([
+            "movegen",
+            "legal",
+            "--fen",
+            "8/8/8/3pP3/8/8/8/4K2k w - d6 0 1",
+        ])
+        .output()
+        .expect("run rookforge movegen legal --fen en-passant position");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
+    assert!(stdout.contains("e5d6"));
 }
