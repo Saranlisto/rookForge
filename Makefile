@@ -1,4 +1,4 @@
-.PHONY: fmt clippy test build smoke check perft
+.PHONY: fmt clippy test build release smoke check perft
 
 fmt:
 	cargo fmt
@@ -12,6 +12,9 @@ test:
 build:
 	cargo build
 
+release:
+	cargo build --release
+
 smoke:
 	cargo run -- --version
 	cargo run -- help
@@ -20,6 +23,7 @@ smoke:
 	cargo run -- search --fen startpos --depth 1
 	cargo run -- search --fen startpos --depth 2
 	cargo run -- search --fen startpos --depth 3
+	cargo run -- search --fen startpos --depth 0 --json
 	cargo run -- perft --help
 	cargo run -- perft --fen startpos --depth 1
 	cargo run -- perft --fen startpos --depth 2

@@ -34,7 +34,7 @@ Initial core modules:
 
 ## Current Status
 
-Rookforge is currently a production-grade scaffold with structural FEN parsing, board inspection helpers, UCI-style move parsing, combined pseudo-legal move generation, basic move application, attack detection, legal move filtering, castling, en passant, perft validation, perft divide output, material-only evaluation, fixed-depth alpha-beta search, terminal-state scoring, quiescence search, and local debug commands. It does not yet implement UCI play or time-managed search.
+Rookforge is currently a production-grade scaffold with structural FEN parsing, board inspection helpers, UCI-style move parsing, combined pseudo-legal move generation, basic move application, attack detection, legal move filtering, castling, en passant, perft validation, perft divide output, material-only evaluation, fixed-depth alpha-beta search, terminal-state scoring, quiescence search, local debug commands, cleaner CLI errors, and release-build workflow commands. It does not yet implement UCI play or time-managed search.
 
 Execution completed to date:
 
@@ -58,6 +58,7 @@ Execution completed to date:
 | 016 | Material-only static evaluation, white-positive score convention, evaluation tests, and `eval --fen`. |
 | 017 | Fixed-depth negamax search, side-to-move score convention, best-move selection, and `search --fen ... --depth ...`. |
 | 018 | Alpha-beta search, terminal-state scoring, tactical move ordering, capture/promotion quiescence, and richer search stats. |
+| 019 | CLI/release polish, consistent help text, cleaner errors, `search --json`, and `make release`. |
 
 Implemented:
 
@@ -87,6 +88,8 @@ Implemented:
 - Checkmate and stalemate outcome handling in search
 - Capture/promotion-only quiescence search with a depth guard
 - Basic tactical move ordering for search and quiescence
+- Stable JSON output for the search debug command
+- Consistent CLI help/error text for current commands
 - Human-readable board display for debugging
 - Unit tests for the placeholder types
 - CLI tests for basic command behavior
@@ -140,6 +143,34 @@ Intentionally not implemented yet:
 6. Add benchmarks and strength testing.
 7. Add Lichess bot bridge after the core engine is stable.
 
+## Quickstart
+
+Build and smoke-test the current engine locally:
+
+```bash
+cargo build
+cargo run -- --version
+cargo run -- board --fen startpos
+cargo run -- movegen legal --fen startpos
+cargo run -- perft --fen startpos --depth 2
+cargo run -- eval --fen startpos
+cargo run -- search --fen startpos --depth 3
+cargo run -- search --fen startpos --depth 0 --json
+```
+
+Run the full pre-commit validation workflow:
+
+```bash
+make check
+```
+
+Build the optimized release binary:
+
+```bash
+make release
+./target/release/rookforge --version
+```
+
 ## Local Development
 
 Run the full local validation workflow before every commit:
@@ -156,6 +187,15 @@ Run deeper perft reference positions separately when touching move generation:
 make perft
 ```
 
+Release builds use Cargo's standard optimized release profile for now:
+
+```bash
+make release
+./target/release/rookforge --version
+```
+
+Cross-platform packaging and installer artifacts are intentionally deferred.
+
 Useful local smoke commands:
 
 ```bash
@@ -166,6 +206,7 @@ cargo run -- eval --fen "8/8/8/8/8/8/4P3/4K2k w - - 0 1"
 cargo run -- search --fen startpos --depth 1
 cargo run -- search --fen startpos --depth 2
 cargo run -- search --fen startpos --depth 3
+cargo run -- search --fen startpos --depth 0 --json
 cargo run -- perft --fen startpos --depth 1
 cargo run -- perft --fen startpos --depth 2
 cargo run -- perft --fen startpos --depth 2 --divide
@@ -195,6 +236,7 @@ cargo fmt
 cargo clippy --all-targets -- -D warnings
 cargo test
 cargo build
+cargo build --release
 ```
 
 CLI examples:
@@ -213,6 +255,7 @@ rookforge search --fen startpos --depth 1
 rookforge search --fen startpos --depth 2
 rookforge search --fen startpos --depth 3
 rookforge search --fen startpos --depth 3 --no-quiescence
+rookforge search --fen startpos --depth 0 --json
 rookforge move --parse e2e4
 rookforge movegen pawns --fen startpos
 rookforge movegen knights --fen startpos

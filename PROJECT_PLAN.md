@@ -22,6 +22,7 @@ For the public execution ledger, see [EXECUTION_STATUS.md](EXECUTION_STATUS.md).
 - Day 016: Material-only static evaluation, white-positive centipawn convention, evaluation tests, CLI `eval --fen`, and local smoke checks.
 - Day 017: Fixed-depth negamax search, best-move selection, side-to-move score convention, CLI `search --fen ... --depth ...`, and local smoke checks.
 - Day 018: Alpha-beta search, checkmate/stalemate scoring, tactical move ordering, quiescence search, richer search stats, and local smoke checks.
+- Day 019: CLI and release polish with consistent help sections, cleaner invalid FEN/move/depth errors, search JSON output, release-build docs, and `make release`.
 
 ## Near-Term Plan
 

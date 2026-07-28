@@ -159,6 +159,69 @@ fn search_startpos_no_quiescence_succeeds() {
 }
 
 #[test]
+fn search_startpos_json_succeeds() {
+    let output = Command::new(env!("CARGO_BIN_EXE_rookforge"))
+        .args(["search", "--fen", "startpos", "--depth", "0", "--json"])
+        .output()
+        .expect("run rookforge search --fen startpos --depth 0 --json");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
+    assert!(stdout.starts_with('{'));
+    assert!(stdout.ends_with("}\n"));
+    assert!(stdout.contains("\"fen\":\"startpos\""));
+    assert!(stdout.contains("\"depth\":0"));
+    assert!(stdout.contains("\"best_move\":null"));
+    assert!(stdout.contains("\"outcome\":\"bestmove\""));
+    assert!(stdout.contains("\"search\":\"alpha-beta+quiescence\""));
+}
+
+#[test]
+fn invalid_fen_returns_clean_error() {
+    let output = Command::new(env!("CARGO_BIN_EXE_rookforge"))
+        .args(["board", "--fen", "8/8/8/8/8/8/8 w - - 0 1"])
+        .output()
+        .expect("run rookforge board with invalid FEN");
+
+    assert!(!output.status.success());
+    assert!(output.stdout.is_empty());
+    let stderr = String::from_utf8(output.stderr).expect("utf8 stderr");
+    assert!(stderr.starts_with("error: invalid FEN"));
+    assert!(stderr.contains("Use `startpos` or a full six-field FEN."));
+    assert!(!stderr.contains("panicked"));
+}
+
+#[test]
+fn invalid_move_returns_clean_error() {
+    let output = Command::new(env!("CARGO_BIN_EXE_rookforge"))
+        .args(["move", "--parse", "e2e9"])
+        .output()
+        .expect("run rookforge move with invalid move");
+
+    assert!(!output.status.success());
+    assert!(output.stdout.is_empty());
+    let stderr = String::from_utf8(output.stderr).expect("utf8 stderr");
+    assert!(stderr.starts_with("error: invalid move `e2e9`"));
+    assert!(stderr.contains("Use UCI-style long algebraic notation"));
+    assert!(!stderr.contains("panicked"));
+}
+
+#[test]
+fn invalid_search_depth_returns_clean_error() {
+    let output = Command::new(env!("CARGO_BIN_EXE_rookforge"))
+        .args(["search", "--fen", "startpos", "--depth", "deep"])
+        .output()
+        .expect("run rookforge search with invalid depth");
+
+    assert!(!output.status.success());
+    assert!(output.stdout.is_empty());
+    let stderr = String::from_utf8(output.stderr).expect("utf8 stderr");
+    assert!(stderr.starts_with("error: invalid depth `deep`"));
+    assert!(stderr.contains("expected an integer"));
+    assert!(!stderr.contains("panicked"));
+}
+
+#[test]
 fn board_startpos_succeeds() {
     let output = Command::new(env!("CARGO_BIN_EXE_rookforge"))
         .args(["board", "--fen", "startpos"])

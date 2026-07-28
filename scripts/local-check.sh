@@ -12,6 +12,7 @@ cargo run -- eval --fen "8/8/8/8/8/8/4P3/4K2k w - - 0 1"
 cargo run -- search --fen startpos --depth 1
 cargo run -- search --fen startpos --depth 2
 cargo run -- search --fen startpos --depth 3
+cargo run -- search --fen startpos --depth 0 --json
 cargo run -- perft --help
 cargo run -- perft --fen startpos --depth 1
 cargo run -- perft --fen startpos --depth 2
