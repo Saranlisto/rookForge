@@ -4,7 +4,7 @@ This file is the public progress ledger for Rookforge. It summarizes what has be
 
 ## Current Snapshot
 
-Rookforge is in the early engine-core phase. The repository can parse positions, inspect boards, parse UCI-style moves, generate pseudo-legal moves for all piece types, apply basic moves to create a new position, detect attacked squares, filter legal moves, execute castling and en passant, run perft validation with divide output, evaluate material, and run fixed-depth negamax search. It does not yet play through UCI.
+Rookforge is in the early engine-core phase. The repository can parse positions, inspect boards, parse UCI-style moves, generate pseudo-legal moves for all piece types, apply basic moves to create a new position, detect attacked squares, filter legal moves, execute castling and en passant, run perft validation with divide output, evaluate material, and run fixed-depth alpha-beta search with terminal handling and quiescence. It does not yet play through UCI.
 
 ## Completed Work
 
@@ -27,6 +27,7 @@ Rookforge is in the early engine-core phase. The repository can parse positions,
 | 015 | Perft validation | Added Kiwipete perft reference tests, start-position depth 3 coverage, perft divide output, timing/throughput CLI fields, and `make perft`. |
 | 016 | Material evaluation | Added material-only static evaluation, white-positive centipawn convention, material value constants, evaluation tests, and `rookforge eval --fen ...`. |
 | 017 | Fixed-depth search | Added plain negamax search, side-to-move search score convention, best-move selection, search tests, and `rookforge search --fen ... --depth ...`. |
+| 018 | Alpha-beta and quiescence | Added fixed-depth alpha-beta search, checkmate/stalemate scoring, tactical move ordering, capture/promotion quiescence, qnode stats, timing stats, and `--no-quiescence`. |
 
 ## Public Commands Available
 
@@ -37,6 +38,8 @@ rookforge eval --fen startpos
 rookforge eval --fen "8/8/8/8/8/8/4P3/4K2k w - - 0 1"
 rookforge search --fen startpos --depth 1
 rookforge search --fen startpos --depth 2
+rookforge search --fen startpos --depth 3
+rookforge search --fen startpos --depth 3 --no-quiescence
 rookforge perft --help
 rookforge perft --fen startpos --depth 1
 rookforge perft --fen startpos --depth 2
@@ -78,11 +81,9 @@ make perft
 
 - Unapply move transitions
 - Reversible move history
-- Alpha-beta pruning
-- Quiescence search
-- Move ordering
 - Transposition tables
 - Iterative deepening
+- Time management
 - Piece-square tables, mobility, king safety, and other advanced evaluation terms
 - UCI engine protocol loop
 - Opening books
@@ -91,4 +92,4 @@ make perft
 
 ## Next Recommended Execution
 
-Day 018 should add alpha-beta pruning while keeping the plain negamax path available for comparison tests.
+Day 019 should add iterative deepening and a basic time-budgeted search entry point.

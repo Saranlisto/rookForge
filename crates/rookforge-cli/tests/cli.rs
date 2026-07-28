@@ -113,7 +113,10 @@ fn search_startpos_depth_one_succeeds() {
     assert!(stdout.contains("best_move: "));
     assert!(!stdout.contains("best_move: none"));
     assert!(stdout.contains("score_cp: 0\n"));
-    assert!(stdout.contains("nodes: 20\n"));
+    assert!(stdout.contains("nodes: "));
+    assert!(stdout.contains("qnodes: "));
+    assert!(stdout.contains("outcome: bestmove\n"));
+    assert!(stdout.contains("search: alpha-beta+quiescence\n"));
 }
 
 #[test]
@@ -130,6 +133,29 @@ fn search_startpos_depth_two_succeeds() {
     assert!(stdout.contains("best_move: "));
     assert!(stdout.contains("score_cp: 0\n"));
     assert!(stdout.contains("nodes: "));
+    assert!(stdout.contains("qnodes: "));
+    assert!(stdout.contains("outcome: bestmove\n"));
+    assert!(stdout.contains("search: alpha-beta+quiescence\n"));
+}
+
+#[test]
+fn search_startpos_no_quiescence_succeeds() {
+    let output = Command::new(env!("CARGO_BIN_EXE_rookforge"))
+        .args([
+            "search",
+            "--fen",
+            "startpos",
+            "--depth",
+            "1",
+            "--no-quiescence",
+        ])
+        .output()
+        .expect("run rookforge search --fen startpos --depth 1 --no-quiescence");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
+    assert!(stdout.contains("qnodes: 0\n"));
+    assert!(stdout.contains("search: alpha-beta\n"));
 }
 
 #[test]

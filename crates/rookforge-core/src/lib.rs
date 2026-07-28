@@ -23,7 +23,11 @@ pub use movegen::{
     generate_sliding_piece_moves, is_in_check, is_square_attacked, perft, perft_divide, Move,
     MoveApplyError, MoveParseError,
 };
-pub use search::{evaluate_for_side_to_move, search_best_move, SearchResult};
+pub use search::{
+    evaluate_for_side_to_move, is_checkmate, is_stalemate, ordered_moves, search_best_move,
+    search_best_move_with_options, search_best_move_without_quiescence, SearchKind, SearchOptions,
+    SearchOutcome, SearchResult, MATE_SCORE, MAX_QUIESCENCE_PLY,
+};
 
 /// Human-readable engine name used by the CLI and future UCI identification.
 pub const ENGINE_NAME: &str = "Rookforge";

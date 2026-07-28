@@ -28,13 +28,13 @@ Initial core modules:
 
 - `board`: board-level primitives such as colors, piece kinds, pieces, and squares
 - `movegen`: move vocabulary, pseudo-legal generation, attack detection, and later legal move generation
-- `search`: fixed-depth negamax search, later alpha-beta and deeper search features
+- `search`: fixed-depth alpha-beta search with terminal handling and quiescence
 - `eval`: material-only static evaluation, later handcrafted evaluation terms
 - `uci`: future Universal Chess Interface support
 
 ## Current Status
 
-Rookforge is currently a production-grade scaffold with structural FEN parsing, board inspection helpers, UCI-style move parsing, combined pseudo-legal move generation, basic move application, attack detection, legal move filtering, castling, en passant, perft validation, perft divide output, material-only evaluation, fixed-depth negamax search, and local debug commands. It does not yet implement UCI play or time-managed search.
+Rookforge is currently a production-grade scaffold with structural FEN parsing, board inspection helpers, UCI-style move parsing, combined pseudo-legal move generation, basic move application, attack detection, legal move filtering, castling, en passant, perft validation, perft divide output, material-only evaluation, fixed-depth alpha-beta search, terminal-state scoring, quiescence search, and local debug commands. It does not yet implement UCI play or time-managed search.
 
 Execution completed to date:
 
@@ -57,6 +57,7 @@ Execution completed to date:
 | 015 | Hardened perft validation, Kiwipete reference coverage, divide output, timing fields, and `make perft`. |
 | 016 | Material-only static evaluation, white-positive score convention, evaluation tests, and `eval --fen`. |
 | 017 | Fixed-depth negamax search, side-to-move score convention, best-move selection, and `search --fen ... --depth ...`. |
+| 018 | Alpha-beta search, terminal-state scoring, tactical move ordering, capture/promotion quiescence, and richer search stats. |
 
 Implemented:
 
@@ -82,7 +83,10 @@ Implemented:
 - Basic recursive perft using legal moves
 - Perft divide output for root-move node counts
 - Material-only static evaluation with a white-positive centipawn convention
-- Fixed-depth negamax search using legal moves and material evaluation
+- Fixed-depth alpha-beta search using legal moves and material evaluation
+- Checkmate and stalemate outcome handling in search
+- Capture/promotion-only quiescence search with a depth guard
+- Basic tactical move ordering for search and quiescence
 - Human-readable board display for debugging
 - Unit tests for the placeholder types
 - CLI tests for basic command behavior
@@ -114,29 +118,27 @@ Search convention:
 ```text
 Positive score = better for the side to move at the root
 Negative score = worse for the side to move at the root
+Checkmate score = +/-100000 adjusted by ply
 ```
 
 Intentionally not implemented yet:
 
 - Unapply/reversible move history
-- Alpha-beta pruning
-- Quiescence search
-- Move ordering
 - Transposition tables
 - Iterative deepening
+- Time management
 - Piece-square tables, mobility, king safety, and other advanced evaluation terms
 - UCI protocol handling
 
 ## Roadmap
 
-1. Add alpha-beta pruning.
-2. Add terminal-state handling for checkmate and stalemate.
-3. Add basic move ordering.
-4. Add reversible move history and unapply scaffolding.
-5. Add UCI command loop.
-6. Add deeper handcrafted evaluation terms.
-7. Add benchmarks and strength testing.
-8. Add Lichess bot bridge after the core engine is stable.
+1. Add iterative deepening and a basic time budget.
+2. Add UCI command loop.
+3. Add reversible move history and unapply scaffolding.
+4. Add transposition tables.
+5. Add deeper handcrafted evaluation terms.
+6. Add benchmarks and strength testing.
+7. Add Lichess bot bridge after the core engine is stable.
 
 ## Local Development
 
@@ -163,6 +165,7 @@ cargo run -- eval --fen startpos
 cargo run -- eval --fen "8/8/8/8/8/8/4P3/4K2k w - - 0 1"
 cargo run -- search --fen startpos --depth 1
 cargo run -- search --fen startpos --depth 2
+cargo run -- search --fen startpos --depth 3
 cargo run -- perft --fen startpos --depth 1
 cargo run -- perft --fen startpos --depth 2
 cargo run -- perft --fen startpos --depth 2 --divide
@@ -208,6 +211,8 @@ rookforge eval --fen startpos
 rookforge eval --fen "8/8/8/8/8/8/4P3/4K2k w - - 0 1"
 rookforge search --fen startpos --depth 1
 rookforge search --fen startpos --depth 2
+rookforge search --fen startpos --depth 3
+rookforge search --fen startpos --depth 3 --no-quiescence
 rookforge move --parse e2e4
 rookforge movegen pawns --fen startpos
 rookforge movegen knights --fen startpos

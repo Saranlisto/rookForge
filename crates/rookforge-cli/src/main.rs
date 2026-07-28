@@ -5,8 +5,8 @@ use std::time::{Duration, Instant};
 use rookforge_core::{
     apply_move, evaluate, generate_bishop_moves, generate_king_moves, generate_knight_moves,
     generate_legal_moves, generate_pawn_moves, generate_pseudo_legal_moves, generate_queen_moves,
-    generate_rook_moves, is_square_attacked, perft, perft_divide, search_best_move, Color, Move,
-    PieceKind, Position, Square, ENGINE_NAME, STARTING_POSITION_FEN,
+    generate_rook_moves, is_square_attacked, perft, perft_divide, search_best_move_with_options,
+    Color, Move, PieceKind, Position, SearchOptions, Square, ENGINE_NAME, STARTING_POSITION_FEN,
 };
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -63,7 +63,10 @@ fn run(args: impl IntoIterator<Item = String>) -> Result<String, String> {
         ["perft", "--fen", fen, "--depth", depth, "--divide"] => perft_divide_from_fen(fen, depth),
         ["perft", ..] => Err("invalid perft command. Try `rookforge perft --help`.".into()),
         ["search", "help"] | ["search", "--help"] | ["search", "-h"] => Ok(search_help_text()),
-        ["search", "--fen", fen, "--depth", depth] => search_from_fen(fen, depth),
+        ["search", "--fen", fen, "--depth", depth] => search_from_fen(fen, depth, true),
+        ["search", "--fen", fen, "--depth", depth, "--no-quiescence"] => {
+            search_from_fen(fen, depth, false)
+        }
         ["search", ..] => Err("invalid search command. Try `rookforge search --help`.".into()),
         [unknown, ..] => Err(format!(
             "unknown command `{unknown}`. Try `rookforge help`."
@@ -113,7 +116,7 @@ fn perft_help_text() -> String {
 }
 
 fn search_help_text() -> String {
-    "rookforge search\n\nUSAGE:\n    rookforge search --fen <FEN|startpos> --depth <DEPTH>\n\nSTATUS:\n    Searches a position with plain fixed-depth negamax.\n"
+    "rookforge search\n\nUSAGE:\n    rookforge search --fen <FEN|startpos> --depth <DEPTH>\n    rookforge search --fen <FEN|startpos> --depth <DEPTH> --no-quiescence\n\nSTATUS:\n    Searches a position with fixed-depth alpha-beta and quiescence by default.\n"
         .to_string()
 }
 
@@ -239,17 +242,24 @@ fn perft_divide_from_fen(fen: &str, depth: &str) -> Result<String, String> {
     Ok(output)
 }
 
-fn search_from_fen(fen: &str, depth: &str) -> Result<String, String> {
+fn search_from_fen(fen: &str, depth: &str, quiescence: bool) -> Result<String, String> {
     let position = position_from_fen(fen)?;
     let depth = depth_from_cli(depth)?;
-    let result = search_best_move(&position, depth);
+    let result = search_best_move_with_options(&position, SearchOptions { depth, quiescence });
     let best_move = result
         .best_move
         .map_or_else(|| "none".to_string(), |mv| mv.to_uci());
 
     Ok(format!(
-        "fen: {fen}\ndepth: {}\nbest_move: {best_move}\nscore_cp: {}\nnodes: {}\n",
-        result.depth, result.score_cp, result.nodes
+        "fen: {fen}\ndepth: {}\nbest_move: {best_move}\nscore_cp: {}\nnodes: {}\nqnodes: {}\nelapsed_ms: {}\nnodes_per_second: {}\noutcome: {}\nsearch: {}\n",
+        result.depth,
+        result.score_cp,
+        result.nodes,
+        result.qnodes,
+        result.elapsed_ms,
+        result.nodes_per_second,
+        result.outcome.label(),
+        result.search.label()
     ))
 }
 
@@ -405,6 +415,7 @@ mod tests {
 
         assert!(output.contains("rookforge search"));
         assert!(output.contains("--depth <DEPTH>"));
+        assert!(output.contains("--no-quiescence"));
     }
 
     #[test]
@@ -423,7 +434,12 @@ mod tests {
         assert!(output.contains("best_move: "));
         assert!(!output.contains("best_move: none"));
         assert!(output.contains("score_cp: 0\n"));
-        assert!(output.contains("nodes: 20\n"));
+        assert!(output.contains("nodes: "));
+        assert!(output.contains("qnodes: "));
+        assert!(output.contains("elapsed_ms: "));
+        assert!(output.contains("nodes_per_second: "));
+        assert!(output.contains("outcome: bestmove\n"));
+        assert!(output.contains("search: alpha-beta+quiescence\n"));
     }
 
     #[test]
@@ -437,10 +453,30 @@ mod tests {
         ])
         .expect("search output");
 
-        assert_eq!(
-            output,
-            "fen: 8/8/8/8/8/8/8/8 w - - 0 1\ndepth: 1\nbest_move: none\nscore_cp: 0\nnodes: 1\n"
-        );
+        assert!(output.contains("fen: 8/8/8/8/8/8/8/8 w - - 0 1\n"));
+        assert!(output.contains("depth: 1\n"));
+        assert!(output.contains("best_move: none\n"));
+        assert!(output.contains("score_cp: 0\n"));
+        assert!(output.contains("nodes: 1\n"));
+        assert!(output.contains("qnodes: 0\n"));
+        assert!(output.contains("outcome: stalemate\n"));
+        assert!(output.contains("search: alpha-beta+quiescence\n"));
+    }
+
+    #[test]
+    fn search_command_supports_no_quiescence() {
+        let output = run([
+            "search".to_string(),
+            "--fen".to_string(),
+            "startpos".to_string(),
+            "--depth".to_string(),
+            "1".to_string(),
+            "--no-quiescence".to_string(),
+        ])
+        .expect("search output");
+
+        assert!(output.contains("qnodes: 0\n"));
+        assert!(output.contains("search: alpha-beta\n"));
     }
 
     #[test]
